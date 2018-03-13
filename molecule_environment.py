@@ -1,7 +1,7 @@
 __author__ = "Bowen Liu"
 __copyright__ = "Copyright 2018, Stanford University"
 
-import networkx as nx
+# import networkx as nx
 import numpy as np
 from rdkit import Chem  # for debug
 
