@@ -70,18 +70,17 @@ class MultiCategoricalPdType(PdType):
     def sample_dtype(self):
         return tf.int32
 
-class TwoCategoricalPdType(PdType):
-    def __init__(self, ncat1, ncat2):
-        self.ncat1 = ncat1
-        self.ncat2 = ncat2
+class MultiCatCategoricalPdType(PdType): # concat multiple categorical
+    def __init__(self, ncat_list):
+        self.ncat_list = ncat_list
     def pdclass(self):
-        return TwoCategoricalPd
-    def pdfromflat(self, flat1, flat2):
-        return TwoCategoricalPd(flat1,flat2)
+        return MultiCatCategoricalPd
+    def pdfromflat(self, flat_list):
+        return MultiCatCategoricalPd(flat_list)
     def param_shape(self):
-        return [self.ncat1,self.ncat2]
+        return self.ncat_list
     def sample_shape(self):
-        return [2]
+        return len(self.ncat_list)
     def sample_dtype(self):
         return tf.int32
 
@@ -194,6 +193,27 @@ class TwoCategoricalPd(Pd):
     def __init__(self, logits1, logits2):
         self.flat = None
         self.categoricals = [CategoricalPd(logits1),CategoricalPd(logits2)]
+    def flatparam(self):
+        return self.flat
+    def mode(self):
+        return tf.cast(tf.stack([p.mode() for p in self.categoricals], axis=-1), tf.int32)
+    def neglogp(self, x):
+        return tf.add_n([p.neglogp(px) for p, px in zip(self.categoricals, tf.unstack(x, axis=-1))])
+    def kl(self, other):
+        return tf.add_n([p.kl(q) for p, q in zip(self.categoricals, other.categoricals)])
+    def entropy(self):
+        return tf.add_n([p.entropy() for p in self.categoricals])
+    def sample(self):
+        return tf.cast(tf.stack([p.sample() for p in self.categoricals], axis=-1), tf.int32)
+    @classmethod
+    def fromflat(cls, flat):
+        raise NotImplementedError
+
+#
+class MultiCatCategoricalPd(Pd):
+    def __init__(self, logits_list):
+        self.flat = None
+        self.categoricals = [CategoricalPd(logits) for logits in logits_list]
     def flatparam(self):
         return self.flat
     def mode(self):

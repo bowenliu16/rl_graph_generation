@@ -8,6 +8,7 @@ import gym_molecule
 
 class MoleculeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
+    # todo: seed()
 
     def __init__(self):
         possible_atoms = ['C', 'N', 'O']
@@ -18,11 +19,38 @@ class MoleculeEnv(gym.Env):
         # contains the possible atom symbols strs
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
-        self.current_atom_idx = None
         self.total_atoms = 0
         self.total_bonds = 0
 
-    def step(self, action, action_type):
+        self.action_space = gym.spaces.MultiDiscrete([100, 100, 10])  # arbitrary number
+        self.observation_space = {}
+        self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), 100, 100]) # arbitrary number
+        self.observation_space['node'] = gym.Space(shape=[1, 100, len(possible_atoms)]) # arbitrary number
+
+    # def step_old(self, action, action_type):
+    #     """
+    #         Perform a given action
+    #         :param action: [2]
+    #         :param action_type:
+    #         :return: reward of 1 if resulting molecule graph does not exceed valency,
+    #         -1 if otherwise
+    #         """
+    #
+    #
+    #     if action_type == 'add_atom':
+    #         self._add_atom(action)
+    #     elif action_type == 'modify_bond':
+    #         self._modify_bond(action)
+    #     else:
+    #         raise ValueError('Invalid action')
+    #
+    #     # calculate rewards
+    #     if self.check_valency():
+    #         return 1  # arbitrary choice
+    #     else:
+    #         return -1  # arbitrary choice
+
+    def step(self, action):
         """
             Perform a given action
             :param action:
@@ -30,51 +58,76 @@ class MoleculeEnv(gym.Env):
             :return: reward of 1 if resulting molecule graph does not exceed valency,
             -1 if otherwise
             """
-        if action_type == 'add_atom':
-            self._add_atom(action)
-        elif action_type == 'modify_bond':
-            self._modify_bond(action)
+        # take action
+        if action[1]>=self.total_atoms:
+            self._add_atom(action[1]-self.total_atoms) # add new node
+            action[1] = self.total_atoms-1 # new node id
+            self._add_bond(action) # add new edge
         else:
-            raise ValueError('Invalid action')
+            self._add_bond(action) # add new edge
+
+        # get observation
+        ob = self.get_observation()
 
         # calculate rewards
         if self.check_valency():
-            return 1  # arbitrary choice
+            reward = 1  # arbitrary choice
         else:
-            return -1  # arbitrary choice
+            reward = -1  # arbitrary choice
+
+        # info log
+        new = False # not a new episode
+        info = {} # info we care about
+
+        return ob,reward,new,info
+
 
     def reset(self):
         '''
         to avoid error, assume an atom already exists
         :return: ob
         '''
-        # zero atom
-        # self.mol = Chem.RWMol()
-        # self.current_atom_idx = None
-        # self.total_atoms = 0
-        # self.total_bonds = 0
-        # one atom
         self.mol = Chem.RWMol()
-        self.current_atom_idx = None
-        self.total_atoms = 0
+        self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
+        self.total_atoms = 1
         self.total_bonds = 0
+
+        ob = self.get_observation()
         return ob
 
     def render(self, mode='human', close=False):
         return
 
-    def _add_atom(self, action):
+    def _add_atom(self, atom_type_id):
         """
         Adds an atom
-        :param action: one hot np array of dim d_n, where d_n is the number of
-        atom types
+        :param atom_type_id: atom_type id
         :return:
         """
-        assert action.shape == (len(self.possible_atom_types),)
-        atom_type_idx = np.argmax(action)
-        atom_symbol = self.possible_atom_types[atom_type_idx]
-        self.current_atom_idx = self.mol.AddAtom(Chem.Atom(atom_symbol))
+        # assert action.shape == (len(self.possible_atom_types),)
+        # atom_type_idx = np.argmax(action)
+        atom_symbol = self.possible_atom_types[atom_type_id]
+        self.mol.AddAtom(Chem.Atom(atom_symbol))
         self.total_atoms += 1
+
+    def _add_bond(self, action):
+        '''
+
+        :param action: [first_node, second_node, bong_type_id]
+        :return:
+        '''
+        # GetBondBetweenAtoms fails for np.int64
+        bond_type = self.possible_bond_types[action[2]]
+
+        # if bond exists between current atom and other atom, modify the bond
+        # type to new bond type. Otherwise create bond between current atom and
+        # other atom with the new bond type
+        bond = self.mol.GetBondBetweenAtoms(int(action[0]), int(action[1]))
+        if bond:
+            print('bond exist!')
+        else:
+            self.mol.AddBond(int(action[0]), int(action[1]), order=bond_type)
+            self.total_bonds += 1
 
     def _modify_bond(self, action):
         """
@@ -167,26 +220,88 @@ class MoleculeEnv(gym.Env):
 
         return A, E, F
 
+    def get_observation(self):
+        """
+        ob['adj']:b*n*n
+        ob['node']:1*n*m
+        n = atom_num + atom_type_num
+        """
+
+        n = self.total_atoms
+        n_shift = len(self.possible_atom_types) # assume isolated nodes new nodes exist
+
+        d_n = len(self.possible_atom_types)
+        F = np.zeros((1, n+n_shift, d_n))
+        for a in self.mol.GetAtoms():
+            atom_idx = a.GetIdx()
+            atom_symbol = a.GetSymbol()
+            float_array = (atom_symbol == self.possible_atom_types).astype(float)
+            assert float_array.sum() != 0
+            F[0, atom_idx, :] = float_array
+        F[:,-n_shift:,:] = np.eye(n_shift)
+
+        d_e = len(self.possible_bond_types)
+        E = np.zeros((d_e, n+n_shift, n+n_shift))
+        for i in range(d_e):
+            E[i] = np.eye(n+n_shift)
+        for b in self.mol.GetBonds():
+            begin_idx = b.GetBeginAtomIdx()
+            end_idx = b.GetEndAtomIdx()
+            bond_type = b.GetBondType()
+            float_array = (bond_type == self.possible_bond_types).astype(float)
+            assert float_array.sum() != 0
+            E[:, begin_idx, end_idx] = float_array
+            E[:, end_idx, begin_idx] = float_array
+        ob = {}
+        ob['adj'] = E
+        ob['node'] = F
+        return ob
+
 
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
-    # add carbon
-    env.step(np.array([1, 0, 0]), 'add_atom')
-    # add carbon
-    env.step(np.array([1, 0, 0]), 'add_atom')
-    # add double bond between carbon 1 and carbon 2
-    env.step(np.array([[0, 1, 0]]), 'modify_bond')
-    # add carbon
-    env.step(np.array([1, 0, 0]), 'add_atom')
-    # add single bond between carbon 2 and carbon 3
-    env.step(np.array([[0, 0, 0], [1, 0, 0]]), 'modify_bond')
-    # add oxygen
-    env.step(np.array([0, 0, 1]), 'add_atom')
-    # add single bond between carbon 3 and oxygen
-    env.step(np.array([[0, 0, 0], [0, 0, 0], [1, 0, 0]]), 'modify_bond')
-    A,E,F = env.get_matrices()
-    print('A',A)
-    print('E',E)
-    print('F',F)
-    print(env.check_valency())
-    print(env.check_chemical_validity())
+
+    ob = env.reset()
+    print(ob['adj'])
+    print(ob['node'])
+
+    ob,reward,done,info = env.step([0,3,0])
+    ob, reward, done, info = env.step([0, 4, 0])
+    print('after add node')
+    print(ob['adj'])
+    print(ob['node'])
+    print(reward)
+
+
+    # # add carbon
+    # env.step(np.array([1, 0, 0]), 'add_atom')
+    # # add carbon
+    # env.step(np.array([1, 0, 0]), 'add_atom')
+    # # add double bond between carbon 1 and carbon 2
+    # env.step(np.array([[0, 1, 0]]), 'modify_bond')
+    # # add carbon
+    # env.step(np.array([1, 0, 0]), 'add_atom')
+    # # add single bond between carbon 2 and carbon 3
+    # env.step(np.array([[0, 0, 0], [1, 0, 0]]), 'modify_bond')
+    # # add oxygen
+    # env.step(np.array([0, 0, 1]), 'add_atom')
+    #
+    # # add single bond between carbon 3 and oxygen
+    # env.step(np.array([[0, 0, 0], [0, 0, 0], [1, 0, 0]]), 'modify_bond')
+
+    # A,E,F = env.get_matrices()
+    # print('A',A.shape)
+    # print('E',E.shape)
+    # print('F',F.shape)
+    # print('A\n',A)
+    # print('E\n', np.sum(E,axis=2))
+
+    # print(env.check_valency())
+    # print(env.check_chemical_validity())
+
+    # # test get ob
+    # ob = env.get_observation()
+    # print(ob['adj'].shape,ob['node'].shape)
+    # for i in range(3):
+    #     print(ob['adj'][i])
+    # print(ob['node'])
