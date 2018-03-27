@@ -70,6 +70,22 @@ class MultiCategoricalPdType(PdType):
     def sample_dtype(self):
         return tf.int32
 
+class TwoCategoricalPdType(PdType):
+    def __init__(self, ncat1, ncat2):
+        self.ncat1 = ncat1
+        self.ncat2 = ncat2
+    def pdclass(self):
+        return TwoCategoricalPd
+    def pdfromflat(self, flat1, flat2):
+        return TwoCategoricalPd(flat1,flat2)
+    def param_shape(self):
+        return [self.ncat1,self.ncat2]
+    def sample_shape(self):
+        return [2]
+    def sample_dtype(self):
+        return tf.int32
+
+
 class DiagGaussianPdType(PdType):
     def __init__(self, size):
         self.size = size
@@ -158,6 +174,26 @@ class MultiCategoricalPd(Pd):
     def __init__(self, nvec, flat):
         self.flat = flat
         self.categoricals = list(map(CategoricalPd, tf.split(flat, nvec, axis=-1)))
+    def flatparam(self):
+        return self.flat
+    def mode(self):
+        return tf.cast(tf.stack([p.mode() for p in self.categoricals], axis=-1), tf.int32)
+    def neglogp(self, x):
+        return tf.add_n([p.neglogp(px) for p, px in zip(self.categoricals, tf.unstack(x, axis=-1))])
+    def kl(self, other):
+        return tf.add_n([p.kl(q) for p, q in zip(self.categoricals, other.categoricals)])
+    def entropy(self):
+        return tf.add_n([p.entropy() for p in self.categoricals])
+    def sample(self):
+        return tf.cast(tf.stack([p.sample() for p in self.categoricals], axis=-1), tf.int32)
+    @classmethod
+    def fromflat(cls, flat):
+        raise NotImplementedError
+
+class TwoCategoricalPd(Pd):
+    def __init__(self, logits1, logits2):
+        self.flat = None
+        self.categoricals = [CategoricalPd(logits1),CategoricalPd(logits2)]
     def flatparam(self):
         return self.flat
     def mode(self):

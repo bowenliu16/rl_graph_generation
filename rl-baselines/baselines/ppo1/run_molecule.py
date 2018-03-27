@@ -8,7 +8,7 @@ from baselines import logger
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 from baselines.common.cmd_util import atari_arg_parser
 
-# import gym-molecule
+import gym
 
 def train(env_id, num_timesteps, seed):
     from baselines.ppo1 import pposgd_simple, cnn_policy
@@ -24,13 +24,14 @@ def train(env_id, num_timesteps, seed):
     set_global_seeds(workerseed)
     env = gym.make('molecule-v0')
     def policy_fn(name, ob_space, ac_space): #pylint: disable=W0613
-        return cnn_policy.CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
-    env = bench.Monitor(env, logger.get_dir() and
-        osp.join(logger.get_dir(), str(rank)))
+        # return cnn_policy.CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
+        return gcn_policy.GCNPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
+    # env = bench.Monitor(env, logger.get_dir() and
+    #     osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)
 
-    env = wrap_deepmind(env)
-    env.seed(workerseed)
+    # env = wrap_deepmind(env)
+    # env.seed(workerseed)
 
     pposgd_simple.learn(env, policy_fn,
         max_timesteps=int(num_timesteps * 1.1),
