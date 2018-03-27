@@ -44,10 +44,21 @@ class MoleculeEnv(gym.Env):
             return -1  # arbitrary choice
 
     def reset(self):
+        '''
+        to avoid error, assume an atom already exists
+        :return: ob
+        '''
+        # zero atom
+        # self.mol = Chem.RWMol()
+        # self.current_atom_idx = None
+        # self.total_atoms = 0
+        # self.total_bonds = 0
+        # one atom
         self.mol = Chem.RWMol()
         self.current_atom_idx = None
         self.total_atoms = 0
         self.total_bonds = 0
+        return ob
 
     def render(self, mode='human', close=False):
         return

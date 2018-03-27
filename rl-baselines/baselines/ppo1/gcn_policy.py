@@ -35,66 +35,6 @@ def bilinear(emb_1, emb_2, name='bilinear'):
         W = tf.get_variable("W", [node_dim, node_dim])
         return emb_1 @ W @ tf.transpose(emb_2)
 
-# class GCNPolicy(object):
-#     recurrent = False
-#     def __init__(self, name, ob_space, ac_space, kind='simple'):
-#         with tf.variable_scope(name):
-#             self._init(ob_space, ac_space, kind)
-#             self.scope = tf.get_variable_scope().name
-#
-#     def _init(self, ob_space, ac_space, gcn_type, policy_type):
-#         self.pdtype = pdtype = make_pdtype(ac_space)
-#
-#         ob = {}
-#         ob['adj'] = tf.placeholder(shape=ob_space['adj'],dtype=tf.float32)
-#         ob['node'] = tf.placeholder(shape=ob_space['node'],dtype=tf.float32)
-#
-#         # 1 get node embedding
-#         if gcn_type == 'simple': # from A3C paper
-#             emb_node = GCN(ob['adj'],ob['node'],32,name='gcn1')
-#             emb_node = GCN(ob['adj'],emb_node,32,is_act=False,is_normalize=True,name='gcn2')
-#             emb_node = tf.squeeze(emb_node) # n*f
-#         else:
-#             raise NotImplementedError
-#         # 2 get graph embedding
-#         emb_graph = tf.reduce_max(emb_node, axis=0)  # max pooling
-#         # 3 get pairwise similarity
-#         if policy_type == 'direct':
-#             dot_node = emb_node @ tf.transpose(emb_node) # todo: try bilinear
-#         else:
-#             # first select a node's emb
-#             select_score = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_select1')
-#             select_score = tf.layers.dense(select_score, 1, activation=None,
-#                                            name='linear_select2')  # add_edge_score, add_node_score
-#             select_first = tf.arg_max(select_score)  # get the argmax score todo: try sample
-#             emb_select = emb_node[select_first, :]
-#             # prob_select =
-#             # then make prediction
-#             dot_node = emb_select @ tf.transpose(emb_node) # 1*n
-#             select_second = tf.arg_max(dot_node)
-#
-#         logits = tf.layers.dense(x, pdtype.param_shape()[0], name='logits', kernel_initializer=U.normc_initializer(0.01))
-#         self.pd = pdtype.pdfromflat(logits)
-#         self.vpred = tf.layers.dense(x, 1, name='value', kernel_initializer=U.normc_initializer(1.0))[:,0]
-#
-#         self.state_in = []
-#         self.state_out = []
-#
-#         stochastic = tf.placeholder(dtype=tf.bool, shape=())
-#         ac = self.pd.sample() # XXX
-#         self._act = U.function([stochastic, ob], [ac, self.vpred])
-#
-#     def act(self, stochastic, ob):
-#         ac1, vpred1 =  self._act(stochastic, ob)
-#         return ac1[0], vpred1[0]
-#     def get_variables(self):
-#         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
-#     def get_trainable_variables(self):
-#         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)
-#     def get_initial_state(self):
-#         return []
-
-
 
 
 class GCNPolicy(object):
@@ -105,19 +45,23 @@ class GCNPolicy(object):
             self.scope = tf.get_variable_scope().name
 
     def _init(self, ob_space, ac_space, kind):
-        # assert isinstance(ob_space, gym.spaces.Box)
+        self.pdtype = TwoCategoricalPdType
 
-        self.pdtype = pdtype = TwoCategoricalPdType
-        sequence_length = None
-
-        ob = {'adj':U.get_placeholder(name="adj", dtype=tf.float32, shape=ob_space['adj'].shape),
-              'node':U.get_placeholder(name="node", dtype=tf.float32, shape=ob_space['node'].shape)}
+        # fixed size ob
+        # ob = {'adj':U.get_placeholder(name="adj", dtype=tf.float32, shape=ob_space['adj'].shape),
+        #       'node':U.get_placeholder(name="node", dtype=tf.float32, shape=ob_space['node'].shape)}
+        ob = {'adj': U.get_placeholder(name="adj", dtype=tf.float32, shape=[ob_space['adj'].shape[0],None,None]),
+              'node': U.get_placeholder(name="node", dtype=tf.float32, shape=[1,None,ob_space['node'].shape[2]])}
+        print('ob_adj', ob['adj'].get_shape())
         if kind == 'small': # from A3C paper
             emb_node = GCN(ob['adj'], ob['node'], 32, name='gcn1')
             emb_node = GCN(ob['adj'], emb_node, 32, is_act=False, is_normalize=True, name='gcn2')
-            emb_node = tf.squeeze(emb_node)  # n*f
+            emb_node = tf.reshape(emb_node,shape=[-1,emb_node.get_shape()[-1]])  # n*f
+            print('emb_node', emb_node.get_shape())
+
         else:
             raise NotImplementedError
+
         # 2 get graph embedding
         emb_graph = tf.reduce_max(emb_node, axis=0)  # max pooling
         # 3.1: select a node's emb
@@ -136,7 +80,7 @@ class GCNPolicy(object):
         ac_second = pd_second.sample()
 
         print(logits_first.get_shape(),logits_second.get_shape())
-        self.pd = TwoCategoricalPdType(ob_space['adj'].shape[-1],ob_space['adj'].shape[-1]).pdfromflat(logits_first,logits_second)
+        self.pd = self.pdtype(ob_space['adj'].shape[-1],ob_space['adj'].shape[-1]).pdfromflat(logits_first,logits_second)
         self.vpred = tf.reduce_max(tf.layers.dense(emb_node, 1, name='value', kernel_initializer=U.normc_initializer(1.0)),axis=0)
 
         self.state_in = []
@@ -191,6 +135,8 @@ if __name__ == "__main__":
     ob['node'] = np.ones([1,5,3])
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for i in range(1):
+        for i in range(1,10):
+            ob['adj'] = np.ones([2, i, i])
+            ob['node'] = np.ones([1, i, 3])
             ac,vpred = policy.act(stochastic,ob)
             print('ac',ac,'vpred',vpred)
