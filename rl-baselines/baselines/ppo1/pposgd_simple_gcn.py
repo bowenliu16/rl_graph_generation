@@ -23,8 +23,8 @@ def traj_segment_generator(pi, env, horizon, stochastic):
 
     # Initialize history arrays
     # obs = np.array([ob for _ in range(horizon)])
-    ob_adjs = [ob_adj for _ in range(horizon)]
-    ob_nodes = [ob_node for _ in range(horizon)]
+    ob_adjs = np.array([ob_adj for _ in range(horizon)])
+    ob_nodes = np.array([ob_node for _ in range(horizon)])
     rews = np.zeros(horizon, 'float32')
     vpreds = np.zeros(horizon, 'float32')
     news = np.zeros(horizon, 'int32')
@@ -111,8 +111,8 @@ def learn(env, policy_fn, *,
     ob['node'] = U.get_placeholder_cached(name="node")
 
     # ac = pi.pdtype.sample_placeholder([None])
-    ac = tf.placeholder(dtype=tf.int64,shape=env.action_space.nvec.shape)
-    ac = tf.placeholder(dtype=tf.int64, shape=[3,1])
+    # ac = tf.placeholder(dtype=tf.int64,shape=env.action_space.nvec.shape)
+    ac = tf.placeholder(dtype=tf.int64, shape=[None,3])
     print('--------------------')
     print(ac.get_shape())
 
@@ -183,7 +183,7 @@ def learn(env, policy_fn, *,
         vpredbefore = seg["vpred"] # predicted value function before udpate
         atarg = (atarg - atarg.mean()) / atarg.std() # standardized advantage function estimate
         d = Dataset(dict(ob_adj=ob_adj, ob_node=ob_node, ac=ac, atarg=atarg, vtarg=tdlamret), shuffle=not pi.recurrent)
-        optim_batchsize = optim_batchsize #or ob.shape[0]
+        optim_batchsize = optim_batchsize or ob.shape[0]
 
         #if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob) # update running mean/std for policy
 

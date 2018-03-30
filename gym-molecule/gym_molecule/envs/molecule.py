@@ -22,10 +22,11 @@ class MoleculeEnv(gym.Env):
         self.total_atoms = 0
         self.total_bonds = 0
 
-        self.action_space = gym.spaces.MultiDiscrete([100, 100, 10])  # arbitrary number
+        self.max_atom = 50 # allow for batch calculation, zero padding for smaller molecule
+        self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
         self.observation_space = {}
-        self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), 100, 100]) # arbitrary number
-        self.observation_space['node'] = gym.Space(shape=[1, 100, len(possible_atoms)]) # arbitrary number
+        self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
+        self.observation_space['node'] = gym.Space(shape=[1, self.max_atom, len(possible_atoms)])
 
     # def step_old(self, action, action_type):
     #     """
@@ -58,22 +59,27 @@ class MoleculeEnv(gym.Env):
             :return: reward of 1 if resulting molecule graph does not exceed valency,
             -1 if otherwise
             """
+        reward = 0
         # take action
-        if action[1]>=self.total_atoms:
-            self._add_atom(action[1]-self.total_atoms) # add new node
-            action[1] = self.total_atoms-1 # new node id
-            self._add_bond(action) # add new edge
-        else:
-            self._add_bond(action) # add new edge
+        try:
+            if action[0,1]>=self.total_atoms:
+                self._add_atom(action[0,1]-self.total_atoms) # add new node
+                action[0,1] = self.total_atoms-1 # new node id
+                self._add_bond(action) # add new edge
+            else:
+                self._add_bond(action) # add new edge
+        except:
+            print('invalid action')
+            reward -= 1
 
         # get observation
         ob = self.get_observation()
 
         # calculate rewards
         if self.check_valency():
-            reward = 1  # arbitrary choice
+            reward += 1  # arbitrary choice
         else:
-            reward = -1  # arbitrary choice
+            reward += -1  # arbitrary choice
 
         # info log
         new = False # not a new episode
@@ -117,16 +123,16 @@ class MoleculeEnv(gym.Env):
         :return:
         '''
         # GetBondBetweenAtoms fails for np.int64
-        bond_type = self.possible_bond_types[action[2]]
+        bond_type = self.possible_bond_types[action[0,2]]
 
         # if bond exists between current atom and other atom, modify the bond
         # type to new bond type. Otherwise create bond between current atom and
         # other atom with the new bond type
-        bond = self.mol.GetBondBetweenAtoms(int(action[0]), int(action[1]))
+        bond = self.mol.GetBondBetweenAtoms(int(action[0,0]), int(action[0,1]))
         if bond:
             print('bond exist!')
         else:
-            self.mol.AddBond(int(action[0]), int(action[1]), order=bond_type)
+            self.mol.AddBond(int(action[0,0]), int(action[0,1]), order=bond_type)
             self.total_bonds += 1
 
     def _modify_bond(self, action):
@@ -222,8 +228,8 @@ class MoleculeEnv(gym.Env):
 
     def get_observation(self):
         """
-        ob['adj']:b*n*n
-        ob['node']:1*n*m
+        ob['adj']:b*n*n --- 'E'
+        ob['node']:1*n*m --- 'F'
         n = atom_num + atom_type_num
         """
 
@@ -231,19 +237,20 @@ class MoleculeEnv(gym.Env):
         n_shift = len(self.possible_atom_types) # assume isolated nodes new nodes exist
 
         d_n = len(self.possible_atom_types)
-        F = np.zeros((1, n+n_shift, d_n))
+        F = np.zeros((1, self.max_atom, d_n))
         for a in self.mol.GetAtoms():
             atom_idx = a.GetIdx()
             atom_symbol = a.GetSymbol()
             float_array = (atom_symbol == self.possible_atom_types).astype(float)
             assert float_array.sum() != 0
             F[0, atom_idx, :] = float_array
-        F[:,-n_shift:,:] = np.eye(n_shift)
+        temp = F[0,n:n+n_shift,:]
+        F[0,n:n+n_shift,:] = np.eye(n_shift)
 
         d_e = len(self.possible_bond_types)
-        E = np.zeros((d_e, n+n_shift, n+n_shift))
+        E = np.zeros((d_e, self.max_atom, self.max_atom))
         for i in range(d_e):
-            E[i] = np.eye(n+n_shift)
+            E[i,:n+n_shift,:n+n_shift] = np.eye(n+n_shift)
         for b in self.mol.GetBonds():
             begin_idx = b.GetBeginAtomIdx()
             end_idx = b.GetEndAtomIdx()

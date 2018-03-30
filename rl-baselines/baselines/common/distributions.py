@@ -80,7 +80,7 @@ class MultiCatCategoricalPdType(PdType): # concat multiple categorical
     def param_shape(self):
         return self.ncat_list
     def sample_shape(self):
-        return len(self.ncat_list)
+        return [len(self.ncat_list)]
     def sample_dtype(self):
         return tf.int32
 
@@ -143,7 +143,8 @@ class CategoricalPd(Pd):
         # return tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits, labels=x)
         # Note: we can't use sparse_softmax_cross_entropy_with_logits because
         #       the implementation does not allow second-order derivatives...
-        one_hot_actions = tf.one_hot(x, self.logits.get_shape().as_list()[-1])
+        # one_hot_actions = tf.one_hot(x, self.logits.get_shape().as_list()[-1]) # original version
+        one_hot_actions = tf.one_hot(x, tf.shape(self.logits)[-1])
         return tf.nn.softmax_cross_entropy_with_logits(
             logits=self.logits,
             labels=one_hot_actions)
