@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import gym
+import gym_molecule
 from baselines.common.distributions import make_pdtype,MultiCatCategoricalPdType,CategoricalPdType
 import baselines.common.tf_util as U
 
@@ -96,13 +97,27 @@ class GCNPolicy(object):
 
         else:
             raise NotImplementedError
+        # 1 only keep effective nodes
+        # ob_mask = tf.cast(tf.transpose(tf.reduce_sum(ob['node'],axis=-1),[0,2,1]),dtype=tf.bool) # B*n*1
+        ob_len = tf.reduce_sum(tf.squeeze(tf.reduce_sum(ob['node'], axis=-1),axis=-2),axis=-1)  # B
+        ob_len_first = ob_len-3 # todo: add a parameter for 3, number of node types
+        logits_mask = tf.sequence_mask(ob_len, maxlen=tf.shape(ob['node'])[2])
+        logits_first_mask = tf.sequence_mask(ob_len_first,maxlen=tf.shape(ob['node'])[2])
+
+        # ob_mask = tf.tile(ob_mask,[1,1,emb_node.get_shape()[-1]])
+        # emb_node_zero = tf.zeros_like(emb_node)
+        # emb_node = tf.where(condition=ob_mask,x=emb_node,y=emb_node_zero)
+        # logits_first_mask = tf.squeeze(ob_mask,axis=-1)
 
         # 2 get graph embedding
         emb_graph = tf.reduce_max(emb_node, axis=1)  # max pooling
         # 3.1: select first(active) node
-        # rules: do not select isolated nodes
+        # rules: only select effective nodes
         logits_first = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_select1') # todo: do not select isolated nodes!!
         logits_first = tf.squeeze(tf.layers.dense(logits_first, 1, activation=None, name='linear_select2'),axis=-1) # B*n
+        logits_first_null = tf.ones(tf.shape(logits_first))*-1000
+        logits_first = tf.where(condition=logits_first_mask,x=logits_first,y=logits_first_null)
+
         pd_first = CategoricalPdType(-1).pdfromflat(flat=logits_first)
         ac_first = pd_first.sample()
         # emb_first = tf.gather(params=emb_node,indices=ac_first,axis=1)
@@ -113,15 +128,22 @@ class GCNPolicy(object):
 
         # 3.2: select second node
         # rules: do not select first node
-        mask_reverse = tf.one_hot(ac_first, depth=tf.shape(emb_node)[1], dtype=tf.bool, on_value=False, off_value=True)
-        emb_node_clean = tf.boolean_mask(emb_node, mask_reverse)
-        emb_node_clean = tf.reshape(emb_node_clean,[tf.shape(emb_node)[0],-1,emb_node.get_shape()[2]])
-        logits_second = tf.transpose(bilinear(emb_first,emb_node_clean,name='logits_second'),[0,2,1]) # n*1 todo:eliminate impossible selections
-        logits_second = tf.squeeze(logits_second,axis=-1)
-        print(logits_first.get_shape(),logits_second.get_shape())
+        # mask_reverse = tf.one_hot(ac_first, depth=tf.shape(emb_node)[1], dtype=tf.bool, on_value=False, off_value=True)
+        # emb_node_clean = tf.boolean_mask(emb_node, mask_reverse)
+        # emb_node_clean = tf.reshape(emb_node_clean,[tf.shape(emb_node)[0],-1,emb_node.get_shape()[2]])
+        # logits_second = tf.transpose(bilinear(emb_first,emb_node_clean,name='logits_second'),[0,2,1]) # n*1 todo:eliminate impossible selections
+        # logits_second = tf.squeeze(logits_second,axis=-1)
+
+        logits_second = tf.transpose(bilinear(emb_first, emb_node, name='logits_second'), [0, 2, 1])
+        logits_second = tf.squeeze(logits_second, axis=-1)
+        ac_first_mask = tf.one_hot(ac_first, depth=tf.shape(emb_node)[1], dtype=tf.bool, on_value=False, off_value=True)
+        logits_second_mask = tf.logical_and(logits_mask,ac_first_mask)
+        logits_second_null = tf.ones(tf.shape(logits_second)) * -1000
+        logits_second = tf.where(condition=logits_second_mask, x=logits_second, y=logits_second_null)
+
         pd_second = CategoricalPdType(-1).pdfromflat(flat=logits_second)
         ac_second = pd_second.sample()
-        ac_second += tf.cast(tf.greater_equal(ac_second,ac_first),dtype=tf.int64) # shift sample
+        # ac_second += tf.cast(tf.greater_equal(ac_second,ac_first),dtype=tf.int64) # shift sample
         # emb_second = tf.gather(params=emb_node,indices=ac_second,axis=0)
         mask = tf.one_hot(ac_second, depth=tf.shape(emb_node)[1], dtype=tf.bool, on_value=True, off_value=False)
         emb_second = tf.boolean_mask(emb_node, mask)
@@ -149,12 +171,15 @@ class GCNPolicy(object):
         debug = {}
         debug['logits_first'] = logits_first
         debug['logits_second'] = logits_second
+        debug['ob_len'] = ob_len
 
         stochastic = tf.placeholder(dtype=tf.bool, shape=())
-        self._act = U.function([stochastic, ob['adj'], ob['node']], [self.ac, self.vpred]) # add debug in second arg if needed
+        self._act = U.function([stochastic, ob['adj'], ob['node']], [self.ac, self.vpred,debug]) # add debug in second arg if needed
 
     def act(self, stochastic, ob):
         return self._act(stochastic, ob['adj'][None], ob['node'][None])
+        # return self._act(stochastic, ob['adj'], ob['node'])
+
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
     def get_trainable_variables(self):
@@ -187,21 +212,33 @@ if __name__ == "__main__":
     #     print(y_np.shape)
     #
     #     # print(sess.run(x, feed_dict={adj: adj_np, node_feature: node_feature_np}))
+
     ob_space = {}
     ob_space['adj'] = gym.Space(shape=[3,5,5])
     ob_space['node'] = gym.Space(shape=[1,5,3])
     policy = GCNPolicy(name='policy',ob_space=ob_space,ac_space=None)
+
     stochastic = True
-    ob = {}
+    env = gym.make('molecule-v0')  # in gym format
+    ob = env.reset()
+
+    # ob['adj'] = np.repeat(ob['adj'][None],2,axis=0)
+    # ob['node'] = np.repeat(ob['node'][None],2,axis=0)
+
+    print('adj',ob['adj'].shape)
+    print('node',ob['node'].shape)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for i in range(0,10):
-            ob['adj'] = np.ones([1, 3, 7, 7])
-            ob['node'] = np.ones([1, 1, 7, 3])
-            ac,vpred,debug = policy.act(stochastic,ob)
-            # if ac[0]==ac[1]:
-            #     print('error')
-            # else:
-            # print('i',i,'ac',ac,'vpred',vpred,'debug',debug['logits_first'].shape,debug['logits_second'].shape)
-            print('i', i)
-            print('ac',ac)
+        for i in range(3):
+            ob = env.reset()
+            for j in range(0,10):
+                ac,vpred,debug = policy.act(stochastic,ob)
+                # if ac[0]==ac[1]:
+                #     print('error')
+                # else:
+                # print('i',i,'ac',ac,'vpred',vpred,'debug',debug['logits_first'].shape,debug['logits_second'].shape)
+                print('i', i)
+                # print('ac\n',ac)
+                test = debug['ob_len']
+                # print('debug\n',debug['ob_len'])
+                ob,reward,_,_ = env.step(ac)

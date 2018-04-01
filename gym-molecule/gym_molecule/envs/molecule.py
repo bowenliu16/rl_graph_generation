@@ -59,18 +59,28 @@ class MoleculeEnv(gym.Env):
             :return: reward of 1 if resulting molecule graph does not exceed valency,
             -1 if otherwise
             """
+        print('----------------')
+        # print(action.shape)
+        print('action',action)
+        print('total_atom',self.total_atoms)
         reward = 0
         # take action
-        try:
-            if action[0,1]>=self.total_atoms:
-                self._add_atom(action[0,1]-self.total_atoms) # add new node
-                action[0,1] = self.total_atoms-1 # new node id
-                self._add_bond(action) # add new edge
-            else:
-                self._add_bond(action) # add new edge
-        except:
-            print('invalid action')
-            reward -= 1
+        if action[0, 1] >= self.total_atoms:
+            self._add_atom(action[0, 1] - self.total_atoms)  # add new node
+            action[0, 1] = self.total_atoms - 1  # new node id
+            self._add_bond(action)  # add new edge
+        else:
+            self._add_bond(action)  # add new edge
+        # try:
+        #     if action[0,1]>=self.total_atoms:
+        #         self._add_atom(action[0,1]-self.total_atoms) # add new node
+        #         action[0,1] = self.total_atoms-1 # new node id
+        #         self._add_bond(action) # add new edge
+        #     else:
+        #         self._add_bond(action) # add new edge
+        # except:
+        #     print('invalid action')
+        #     reward -= 1
 
         # get observation
         ob = self.get_observation()
@@ -82,7 +92,10 @@ class MoleculeEnv(gym.Env):
             reward += -1  # arbitrary choice
 
         # info log
-        new = False # not a new episode
+        if self.total_atoms>=5:
+            new = True
+        else:
+            new = False # not a new episode
         info = {} # info we care about
 
         return ob,reward,new,info
@@ -99,6 +112,8 @@ class MoleculeEnv(gym.Env):
         self.total_bonds = 0
 
         ob = self.get_observation()
+        print('----reset----')
+        print(ob)
         return ob
 
     def render(self, mode='human', close=False):
