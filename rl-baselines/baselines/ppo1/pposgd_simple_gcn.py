@@ -33,7 +33,17 @@ def traj_segment_generator(pi, env, horizon, stochastic):
 
     while True:
         prevac = ac
-        ac, vpred = pi.act(stochastic, ob)
+        # print('-------ac-call-----------')
+        ac, vpred, debug = pi.act(stochastic, ob)
+        # print('ob',ob)
+        # print('debug ob_len',debug['ob_len'])
+        # print('debug logits_first_mask', debug['logits_first_mask'])
+        # print('debug logits_second_mask',debug['logits_second_mask'])
+        # print('debug logits_first_mask', debug['logits_first_mask'])
+        # print('debug logits_second_mask', debug['logits_second_mask'])
+        # print('debug',debug)
+        # print('ac',ac)
+
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -65,6 +75,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
             cur_ep_ret = 0
             cur_ep_len = 0
             ob = env.reset()
+            # print('-------reset-call-----------')
         t += 1
 
 def add_vtarg_and_adv(seg, gamma, lam):
@@ -112,15 +123,20 @@ def learn(env, policy_fn, *,
 
     # ac = pi.pdtype.sample_placeholder([None])
     # ac = tf.placeholder(dtype=tf.int64,shape=env.action_space.nvec.shape)
-    ac = tf.placeholder(dtype=tf.int64, shape=[None,3])
-    print('--------------------')
-    print(ac.get_shape())
+    ac = tf.placeholder(dtype=tf.int64, shape=[None,3],name='ac_real')
+    # pi.ac_real = ac
+    # oldpi.ac_real = ac
+
 
     kloldnew = oldpi.pd.kl(pi.pd)
     ent = pi.pd.entropy()
     meankl = tf.reduce_mean(kloldnew)
     meanent = tf.reduce_mean(ent)
     pol_entpen = (-entcoeff) * meanent
+
+    pi_logp = pi.pd.logp(ac)
+    oldpi_logp = oldpi.pd.logp(ac)
+    ratio_log = pi.pd.logp(ac) - oldpi.pd.logp(ac)
 
     ratio = tf.exp(pi.pd.logp(ac) - oldpi.pd.logp(ac)) # pnew / pold
     surr1 = ratio * atarg # surrogate from conservative policy iteration
@@ -132,12 +148,40 @@ def learn(env, policy_fn, *,
     loss_names = ["pol_surr", "pol_entpen", "vf_loss", "kl", "ent"]
 
     var_list = pi.get_trainable_variables()
-    lossandgrad = U.function([ob['adj'], ob['node'], ac, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list)])
+    var_list_all = pi.get_variables()
+    debug={}
+    debug['ac'] = ac
+    debug['ob_adj'] = ob['adj']
+    debug['ob_node'] = ob['node']
+    debug['pi_logp'] = pi_logp
+    debug['oldpi_logp'] = oldpi_logp
+    debug['kloldnew'] = kloldnew
+    debug['ent'] = ent
+    debug['ratio'] = ratio
+    debug['ratio_log'] = ratio_log
+    debug['emb_node2'] = pi.emb_node2
+    debug['pi_logitfirst'] = pi.logits_first
+    debug['pi_logitsecond'] = pi.logits_second
+    debug['pi_logitedge'] = pi.logits_edge
+
+    debug['pi_ac'] = pi.ac
+    debug['oldpi_logitfirst'] = oldpi.logits_first
+    debug['oldpi_logitsecond'] = oldpi.logits_second
+    debug['oldpi_logitedge'] = oldpi.logits_edge
+
+    debug['oldpi_ac'] = oldpi.ac
+
+    with tf.variable_scope('pi/gcn1', reuse=tf.AUTO_REUSE):
+        w = tf.get_variable('W')
+        debug['w'] = w
+
+
+    lossandgrad = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list)]+[debug])
     adam = MpiAdam(var_list, epsilon=adam_epsilon)
 
     assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
         for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
-    compute_losses = U.function([ob['adj'], ob['node'], ac, atarg, ret, lrmult], losses)
+    compute_losses = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses)
 
     U.initialize()
     adam.sync()
@@ -183,7 +227,7 @@ def learn(env, policy_fn, *,
         vpredbefore = seg["vpred"] # predicted value function before udpate
         atarg = (atarg - atarg.mean()) / atarg.std() # standardized advantage function estimate
         d = Dataset(dict(ob_adj=ob_adj, ob_node=ob_node, ac=ac, atarg=atarg, vtarg=tdlamret), shuffle=not pi.recurrent)
-        optim_batchsize = optim_batchsize or ob.shape[0]
+        optim_batchsize = optim_batchsize or ob_adj.shape[0]
 
         #if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob) # update running mean/std for policy
 
@@ -194,7 +238,7 @@ def learn(env, policy_fn, *,
         for _ in range(optim_epochs):
             losses = [] # list of tuples, each of which gives the loss for a minibatch
             for batch in d.iterate_once(optim_batchsize):
-                *newlosses, g = lossandgrad(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
+                *newlosses, g, debug = lossandgrad(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                 adam.update(g, optim_stepsize * cur_lrmult)
                 losses.append(newlosses)
             logger.log(fmt_row(13, np.mean(losses, axis=0)))
@@ -202,7 +246,7 @@ def learn(env, policy_fn, *,
         logger.log("Evaluating losses...")
         losses = []
         for batch in d.iterate_once(optim_batchsize):
-            newlosses = compute_losses(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
+            newlosses = compute_losses(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
             losses.append(newlosses)
         meanlosses,_,_ = mpi_moments(losses, axis=0)
         logger.log(fmt_row(13, meanlosses))

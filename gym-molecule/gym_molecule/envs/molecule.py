@@ -22,7 +22,7 @@ class MoleculeEnv(gym.Env):
         self.total_atoms = 0
         self.total_bonds = 0
 
-        self.max_atom = 50 # allow for batch calculation, zero padding for smaller molecule
+        self.max_atom = 20 # allow for batch calculation, zero padding for smaller molecule
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
         self.observation_space = {}
         self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
@@ -59,16 +59,18 @@ class MoleculeEnv(gym.Env):
             :return: reward of 1 if resulting molecule graph does not exceed valency,
             -1 if otherwise
             """
-        print('----------------')
+        # print('----------------')
         # print(action.shape)
-        print('action',action)
-        print('total_atom',self.total_atoms)
+        # print('action',action)
+        # print('total_atom',self.total_atoms)
         reward = 0
         # take action
         if action[0, 1] >= self.total_atoms:
             self._add_atom(action[0, 1] - self.total_atoms)  # add new node
             action[0, 1] = self.total_atoms - 1  # new node id
-            self._add_bond(action)  # add new edge
+            result = self._add_bond(action)  # add new edge
+            if result==False:
+                reward -= 1
         else:
             self._add_bond(action)  # add new edge
         # try:
@@ -112,8 +114,6 @@ class MoleculeEnv(gym.Env):
         self.total_bonds = 0
 
         ob = self.get_observation()
-        print('----reset----')
-        print(ob)
         return ob
 
     def render(self, mode='human', close=False):
@@ -145,10 +145,12 @@ class MoleculeEnv(gym.Env):
         # other atom with the new bond type
         bond = self.mol.GetBondBetweenAtoms(int(action[0,0]), int(action[0,1]))
         if bond:
-            print('bond exist!')
+            # print('bond exist!')
+            return False
         else:
             self.mol.AddBond(int(action[0,0]), int(action[0,1]), order=bond_type)
             self.total_bonds += 1
+            return True
 
     def _modify_bond(self, action):
         """

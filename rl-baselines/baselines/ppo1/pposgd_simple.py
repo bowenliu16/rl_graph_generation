@@ -180,8 +180,6 @@ def learn(env, policy_fn, *,
         for _ in range(optim_epochs):
             losses = [] # list of tuples, each of which gives the loss for a minibatch
             for batch in d.iterate_once(optim_batchsize):
-                print('------------ob-----------')
-                print(batch['ob'].shape)
                 *newlosses, g = lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                 adam.update(g, optim_stepsize * cur_lrmult)
                 losses.append(newlosses)
