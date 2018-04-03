@@ -69,7 +69,7 @@ class MoleculeEnv(gym.Env):
             self._add_atom(action[0, 1] - self.total_atoms)  # add new node
             action[0, 1] = self.total_atoms - 1  # new node id
             result = self._add_bond(action)  # add new edge
-            if result==False:
+            if result==False: # bond exist
                 reward -= 1
         else:
             self._add_bond(action)  # add new edge
@@ -88,13 +88,13 @@ class MoleculeEnv(gym.Env):
         ob = self.get_observation()
 
         # calculate rewards
-        if self.check_valency():
+        if self.check_valency() and self.check_chemical_validity():
             reward += 1  # arbitrary choice
         else:
-            reward += -1  # arbitrary choice
+            reward -= 1  # arbitrary choice
 
         # info log
-        if self.total_atoms>=5:
+        if self.total_atoms>=10:
             new = True
         else:
             new = False # not a new episode
