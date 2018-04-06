@@ -3,6 +3,7 @@ from gym import error, spaces, utils
 from gym.utils import seeding
 import numpy as np
 from rdkit import Chem
+from rdkit.Chem.Descriptors import qed
 import gym_molecule
 import copy
 
@@ -49,13 +50,31 @@ class MoleculeEnv(gym.Env):
         else:
             self._add_bond(action)  # add new edge
 
-        # calculate rewards
-        if self.check_valency() and self.check_chemical_validity():
+        # calculate intermediate rewards
+        if self.check_valency():
             reward = self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()
         else:
             reward = -1  # arbitrary choice
             self.mol = self.mol_old
         print('reward',reward)
+
+        # calculate terminal rewards
+        if self.mol.GetNumAtoms() >= self.max_atom and self.counter >= 100:
+            #  some arbitrary termination condition for episode
+
+            # check chemical validity of final molecule (valency, as well as
+            # other rdkit molecule checks, such as aromaticity)
+            if not self.check_chemical_validity():
+                reward -= 10 # arbitrary choice
+            else:   # these metrics only work for valid molecules
+                # drug likeness metric to optimize. qed can have values [0, 1]
+                reward += 5**qed(self.mol)    # arbitrary choice of exponent
+
+                # log p. Assume we want to increase log p. log p typically
+                # have values between -3 and 7
+                reward += Chem.Crippen.MolLogP(self.mol)    # arbitrary choice
+
+                #TODO(Bowen): synthetic accessibility metric to optimize
 
         # get observation
         ob = self.get_observation()
