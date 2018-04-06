@@ -169,7 +169,9 @@ class GCNPolicy(object):
 
         # ncat_list = [tf.shape(logits_first),ob_space['adj'].shape[-1],ob_space['adj'].shape[0]]
         self.pd = self.pdtype(-1).pdfromflat([self.logits_first,self.logits_second_real,self.logits_edge_real])
-        self.vpred = tf.reduce_max(tf.layers.dense(emb_node, 1, name='value', kernel_initializer=U.normc_initializer(1.0)),axis=1)
+        self.vpred = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='value1')
+        self.vpred = tf.layers.dense(self.vpred, 1, activation=None, name='value2')
+        self.vpred = tf.reduce_max(self.vpred,axis=1)
 
         self.state_in = []
         self.state_out = []
@@ -242,8 +244,6 @@ if __name__ == "__main__":
                 # print('i',i,'ac',ac,'vpred',vpred,'debug',debug['logits_first'].shape,debug['logits_second'].shape)
                 print('i', i)
                 # print('ac\n',ac)
-                test = debug['pd']
-                print(test)
                 # print('debug\n',debug['ob_len'])
                 ob,reward,_,_ = env.step(ac)
 

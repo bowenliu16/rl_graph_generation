@@ -4,6 +4,7 @@ from gym.utils import seeding
 import numpy as np
 from rdkit import Chem
 import gym_molecule
+import copy
 
 
 class MoleculeEnv(gym.Env):
@@ -19,37 +20,15 @@ class MoleculeEnv(gym.Env):
         # contains the possible atom symbols strs
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
-        self.total_atoms = 0
-        self.total_bonds = 0
 
-        self.max_atom = 20 # allow for batch calculation, zero padding for smaller molecule
+        self.max_atom = 30 # allow for batch calculation, zero padding for smaller molecule
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
         self.observation_space = {}
         self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
         self.observation_space['node'] = gym.Space(shape=[1, self.max_atom, len(possible_atoms)])
 
-    # def step_old(self, action, action_type):
-    #     """
-    #         Perform a given action
-    #         :param action: [2]
-    #         :param action_type:
-    #         :return: reward of 1 if resulting molecule graph does not exceed valency,
-    #         -1 if otherwise
-    #         """
-    #
-    #
-    #     if action_type == 'add_atom':
-    #         self._add_atom(action)
-    #     elif action_type == 'modify_bond':
-    #         self._modify_bond(action)
-    #     else:
-    #         raise ValueError('Invalid action')
-    #
-    #     # calculate rewards
-    #     if self.check_valency():
-    #         return 1  # arbitrary choice
-    #     else:
-    #         return -1  # arbitrary choice
+        self.counter = 0
+
 
     def step(self, action):
         """
@@ -59,42 +38,31 @@ class MoleculeEnv(gym.Env):
             :return: reward of 1 if resulting molecule graph does not exceed valency,
             -1 if otherwise
             """
-        # print('----------------')
-        # print(action.shape)
-        # print('action',action)
-        # print('total_atom',self.total_atoms)
-        reward = 0
+        self.mol_old = copy.deepcopy(self.mol)
+        print('num atoms',self.mol.GetNumAtoms())
+        total_atoms = self.mol.GetNumAtoms()
         # take action
-        if action[0, 1] >= self.total_atoms:
-            self._add_atom(action[0, 1] - self.total_atoms)  # add new node
-            action[0, 1] = self.total_atoms - 1  # new node id
-            result = self._add_bond(action)  # add new edge
-            if result==False: # bond exist
-                reward -= 1
+        if action[0, 1] >= total_atoms:
+            self._add_atom(action[0, 1] - total_atoms)  # add new node
+            action[0, 1] = total_atoms  # new node id
+            self._add_bond(action)  # add new edge
         else:
             self._add_bond(action)  # add new edge
-        # try:
-        #     if action[0,1]>=self.total_atoms:
-        #         self._add_atom(action[0,1]-self.total_atoms) # add new node
-        #         action[0,1] = self.total_atoms-1 # new node id
-        #         self._add_bond(action) # add new edge
-        #     else:
-        #         self._add_bond(action) # add new edge
-        # except:
-        #     print('invalid action')
-        #     reward -= 1
+
+        # calculate rewards
+        if self.check_valency() and self.check_chemical_validity():
+            reward = self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()
+        else:
+            reward = -1  # arbitrary choice
+            self.mol = self.mol_old
+        print('reward',reward)
 
         # get observation
         ob = self.get_observation()
 
-        # calculate rewards
-        if self.check_valency() and self.check_chemical_validity():
-            reward += 1  # arbitrary choice
-        else:
-            reward -= 1  # arbitrary choice
-
+        self.counter += 1
         # info log
-        if self.total_atoms>=10:
+        if self.mol.GetNumAtoms()>=20 or self.counter>=100:
             new = True
         else:
             new = False # not a new episode
@@ -110,9 +78,7 @@ class MoleculeEnv(gym.Env):
         '''
         self.mol = Chem.RWMol()
         self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
-        self.total_atoms = 1
-        self.total_bonds = 0
-
+        self.counter = 0
         ob = self.get_observation()
         return ob
 
@@ -129,7 +95,6 @@ class MoleculeEnv(gym.Env):
         # atom_type_idx = np.argmax(action)
         atom_symbol = self.possible_atom_types[atom_type_id]
         self.mol.AddAtom(Chem.Atom(atom_symbol))
-        self.total_atoms += 1
 
     def _add_bond(self, action):
         '''
@@ -149,7 +114,6 @@ class MoleculeEnv(gym.Env):
             return False
         else:
             self.mol.AddBond(int(action[0,0]), int(action[0,1]), order=bond_type)
-            self.total_bonds += 1
             return True
 
     def _modify_bond(self, action):
@@ -250,7 +214,7 @@ class MoleculeEnv(gym.Env):
         n = atom_num + atom_type_num
         """
 
-        n = self.total_atoms
+        n = self.mol.GetNumAtoms()
         n_shift = len(self.possible_atom_types) # assume isolated nodes new nodes exist
 
         d_n = len(self.possible_atom_types)
@@ -289,8 +253,10 @@ if __name__ == '__main__':
     print(ob['adj'])
     print(ob['node'])
 
-    ob,reward,done,info = env.step([0,3,0])
-    ob, reward, done, info = env.step([0, 4, 0])
+    ac = np.array([[0,3,0]])
+    print(ac.shape)
+    ob,reward,done,info = env.step([[0,3,0]])
+    ob, reward, done, info = env.step([[0, 4, 0]])
     print('after add node')
     print(ob['adj'])
     print(ob['node'])
