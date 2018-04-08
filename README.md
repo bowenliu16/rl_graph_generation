@@ -3,7 +3,7 @@
 ## Installation
 
 - Install rdkit, please refer to the offical website, using anaconda is recommended
-- Install mpi4py, `conda install mpi4py`, install networkx `pip install networkx=1.11`
+- Install mpi4py, `conda install mpi4py`, install networkx `pip install networkx=1.11`, install opencv `conda install opencv` (if needed).
 - Install OpenAI baseline dependencies, run `pip install -e .` in the `rl-baseline` folder
 - Install customized molecule gym environment, run `pip install -e .` in the `gym-molecule` folder
 
