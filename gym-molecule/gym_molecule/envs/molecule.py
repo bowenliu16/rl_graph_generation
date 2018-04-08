@@ -23,7 +23,7 @@ class MoleculeEnv(gym.Env):
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
-        self.max_atom = 30 # allow for batch calculation, zero padding for smaller molecule
+        self.max_atom = 60 # allow for batch calculation, zero padding for smaller molecule
         self.max_action = 200
         self.qed_ratio = 15
         self.sa_ratio = 1
