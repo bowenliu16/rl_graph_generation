@@ -44,7 +44,7 @@ class MoleculeEnv(gym.Env):
             -1 if otherwise
             """
         self.mol_old = copy.deepcopy(self.mol)
-        print('num atoms',self.mol.GetNumAtoms())
+        # print('num atoms',self.mol.GetNumAtoms())
         total_atoms = self.mol.GetNumAtoms()
         # take action
         if action[0, 1] >= total_atoms:
@@ -117,7 +117,7 @@ class MoleculeEnv(gym.Env):
             print('smile',smile)
         else:
             new = False
-            print('counter', self.counter, 'new', new, 'reward_step', reward_step)
+            # print('counter', self.counter, 'new', new, 'reward_step', reward_step)
             reward = reward_step
 
 
