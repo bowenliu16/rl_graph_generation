@@ -24,9 +24,9 @@ class MoleculeEnv(gym.Env):
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
         self.max_atom = 30 # allow for batch calculation, zero padding for smaller molecule
-        self.max_action = 100
-        self.qed_ratio = 10
-        self.sa_ratio = 2
+        self.max_action = 300
+        self.qed_ratio = 5
+        self.sa_ratio = 1
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
         self.observation_space = {}
         self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
@@ -109,11 +109,11 @@ class MoleculeEnv(gym.Env):
 
                 #TODO(Bowen): synthetic accessibility metric to optimize
             new = True # end of episode
-            print('counter', self.counter, 'new', new, 'reward_step', reward_step, 'reward_valid', reward_valid, 'reward_qed', reward_qed, 'reward_logp', reward_logp, 'reward_sa', reward_sa, 'reward_cycle',reward_cycle, 'qed_ratio', self.qed_ratio, 'sa_ratio', self.sa_ratio)
             # reward = reward_step + reward_valid + reward_logp +reward_qed*self.qed_ratio
             # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
             reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
             smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+            print('counter', self.counter, 'new', new, 'reward', reward, 'reward_valid', reward_valid, 'reward_qed', reward_qed, 'reward_logp', reward_logp, 'reward_sa', reward_sa, 'reward_cycle',reward_cycle, 'qed_ratio', self.qed_ratio, 'sa_ratio', self.sa_ratio)
             print('smile',smile)
         else:
             new = False
