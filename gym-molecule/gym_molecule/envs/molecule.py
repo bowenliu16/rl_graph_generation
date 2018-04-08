@@ -6,7 +6,8 @@ from rdkit import Chem
 from rdkit.Chem.Descriptors import qed
 import gym_molecule
 import copy
-
+import networkx as nx
+from .sascorer import calculateScore
 
 class MoleculeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -23,6 +24,8 @@ class MoleculeEnv(gym.Env):
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
         self.max_atom = 30 # allow for batch calculation, zero padding for smaller molecule
+        self.max_action = 200
+        self.qed_ratio = 3
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
         self.observation_space = {}
         self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
@@ -50,42 +53,81 @@ class MoleculeEnv(gym.Env):
         else:
             self._add_bond(action)  # add new edge
 
+        reward = 0
         # calculate intermediate rewards
         if self.check_valency():
-            reward = self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()
+            if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
+                reward_step = 0.1
+            else:
+                reward_step = -0.1
         else:
-            reward = -1  # arbitrary choice
+            reward_step = -0.1  # arbitrary choice
             self.mol = self.mol_old
-        print('reward',reward)
 
         # calculate terminal rewards
-        if self.mol.GetNumAtoms() >= self.max_atom and self.counter >= 100:
+        if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action:
             #  some arbitrary termination condition for episode
 
             # check chemical validity of final molecule (valency, as well as
             # other rdkit molecule checks, such as aromaticity)
             if not self.check_chemical_validity():
-                reward -= 10 # arbitrary choice
+                reward_valid = -10 # arbitrary choice
+                reward_qed = 0
+                reward_logp = 0
+                reward_sa = 0
+                reward_cycle = 0
             else:   # these metrics only work for valid molecules
                 # drug likeness metric to optimize. qed can have values [0, 1]
-                reward += 5**qed(self.mol)    # arbitrary choice of exponent
-
+                reward_valid = 0
+                try:
+                    reward_qed = 5**qed(self.mol)    # arbitrary choice of exponent
                 # log p. Assume we want to increase log p. log p typically
                 # have values between -3 and 7
-                reward += Chem.Crippen.MolLogP(self.mol)    # arbitrary choice
+                    reward_logp = Chem.Crippen.MolLogP(self.mol)    # arbitrary choice
+                    s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+                    m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+                    reward_sa = calculateScore(m) # lower better
+
+                    cycle_list = nx.cycle_basis(nx.Graph(Chem.GetAdjacencyMatrix(self.mol)))
+                    if len(cycle_list) == 0:
+                        cycle_length = 0
+                    else:
+                        cycle_length = max([len(j) for j in cycle_list])
+                    if cycle_length <= 6:
+                        cycle_length = 0
+                    else:
+                        cycle_length = cycle_length - 6
+                    reward_cycle = cycle_length
+
+                    # if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]:
+                    #     reward_sa = calculateScore(self.mol)
+                    # else:
+                    #     reward_sa = 0
+                except:
+                    print('error')
 
                 #TODO(Bowen): synthetic accessibility metric to optimize
+            new = True # end of episode
+            print('counter', self.counter, 'new', new, 'reward_step', reward_step, 'reward_valid', reward_valid, 'reward_qed', reward_qed, 'reward_logp', reward_logp, 'reward_sa', reward_sa, 'reward_cycle',reward_cycle, 'qed_ratio', self.qed_ratio)
+            # reward = reward_step + reward_valid + reward_logp +reward_qed*self.qed_ratio
+            # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
+            reward = reward_step + reward_valid + reward_logp +reward_qed*self.qed_ratio - reward_sa
+            smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+            print('smile',smile)
+        else:
+            new = False
+            print('counter', self.counter, 'new', new, 'reward_step', reward_step)
+            reward = reward_step
+
 
         # get observation
         ob = self.get_observation()
 
-        self.counter += 1
-        # info log
-        if self.mol.GetNumAtoms()>=20 or self.counter>=100:
-            new = True
-        else:
-            new = False # not a new episode
         info = {} # info we care about
+
+        self.counter += 1
+        if new:
+            self.counter = 0
 
         return ob,reward,new,info
 
@@ -272,14 +314,27 @@ if __name__ == '__main__':
     print(ob['adj'])
     print(ob['node'])
 
-    ac = np.array([[0,3,0]])
-    print(ac.shape)
-    ob,reward,done,info = env.step([[0,3,0]])
-    ob, reward, done, info = env.step([[0, 4, 0]])
-    print('after add node')
-    print(ob['adj'])
-    print(ob['node'])
-    print(reward)
+    env.step(np.array([[0,3,0]]))
+    env.step(np.array([[1,4,0]]))
+    env.step(np.array([[0,4,0]]))
+    env.step(np.array([[0,4,0]]))
+
+    s = Chem.MolToSmiles(env.mol, isomericSmiles=True)
+    m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+
+    ring = m.GetRingInfo()
+    print('ring',ring.NumAtomRings(0))
+    s = calculateScore(m)
+    print(s)
+
+    # ac = np.array([[0,3,0]])
+    # print(ac.shape)
+    # ob,reward,done,info = env.step([[0,3,0]])
+    # ob, reward, done, info = env.step([[0, 4, 0]])
+    # print('after add node')
+    # print(ob['adj'])
+    # print(ob['node'])
+    # print(reward)
 
 
     # # add carbon
