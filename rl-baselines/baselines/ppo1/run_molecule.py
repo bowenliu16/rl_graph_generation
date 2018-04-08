@@ -39,10 +39,10 @@ def train(env_id, num_timesteps, seed,writer=None):
 
     pposgd_simple_gcn.learn(env, policy_fn,
         max_timesteps=int(num_timesteps * 1.1),
-        timesteps_per_actorbatch=64,
+        timesteps_per_actorbatch=256,
         clip_param=0.2, entcoeff=0.01,
-        optim_epochs=4, optim_stepsize=1e-3, optim_batchsize=32,
-        gamma=0.99, lam=0.95,
+        optim_epochs=4, optim_stepsize=1e-4, optim_batchsize=64,
+        gamma=0.995, lam=0.95,
         schedule='linear', writer=writer
     )
     env.close()
