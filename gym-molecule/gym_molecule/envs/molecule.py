@@ -25,7 +25,7 @@ class MoleculeEnv(gym.Env):
 
         self.max_atom = 30 # allow for batch calculation, zero padding for smaller molecule
         self.max_action = 200
-        self.qed_ratio = 10
+        self.qed_ratio = 15
         self.sa_ratio = 1
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
         self.observation_space = {}
