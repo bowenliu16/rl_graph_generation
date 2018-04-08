@@ -24,7 +24,7 @@ class MoleculeEnv(gym.Env):
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
         self.max_atom = 30 # allow for batch calculation, zero padding for smaller molecule
-        self.max_action = 300
+        self.max_action = 200
         self.qed_ratio = 5
         self.sa_ratio = 1
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
@@ -76,7 +76,7 @@ class MoleculeEnv(gym.Env):
                 reward_qed = 0
                 reward_logp = 0
                 reward_sa = 0
-                reward_cycle = 0
+                # reward_cycle = 0
             else:   # these metrics only work for valid molecules
                 # drug likeness metric to optimize. qed can have values [0, 1]
                 reward_valid = 0
@@ -89,16 +89,16 @@ class MoleculeEnv(gym.Env):
                     m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
                     reward_sa = calculateScore(m) # lower better
 
-                    cycle_list = nx.cycle_basis(nx.Graph(Chem.GetAdjacencyMatrix(self.mol)))
-                    if len(cycle_list) == 0:
-                        cycle_length = 0
-                    else:
-                        cycle_length = max([len(j) for j in cycle_list])
-                    if cycle_length <= 6:
-                        cycle_length = 0
-                    else:
-                        cycle_length = cycle_length - 6
-                    reward_cycle = cycle_length
+                    # cycle_list = nx.cycle_basis(nx.Graph(Chem.GetAdjacencyMatrix(self.mol)))
+                    # if len(cycle_list) == 0:
+                    #     cycle_length = 0
+                    # else:
+                    #     cycle_length = max([len(j) for j in cycle_list])
+                    # if cycle_length <= 6:
+                    #     cycle_length = 0
+                    # else:
+                    #     cycle_length = cycle_length - 6
+                    # reward_cycle = cycle_length
 
                     # if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]:
                     #     reward_sa = calculateScore(self.mol)
@@ -113,7 +113,7 @@ class MoleculeEnv(gym.Env):
             # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
             reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
             smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-            print('counter', self.counter, 'new', new, 'reward', reward, 'reward_valid', reward_valid, 'reward_qed', reward_qed, 'reward_logp', reward_logp, 'reward_sa', reward_sa, 'reward_cycle',reward_cycle, 'qed_ratio', self.qed_ratio, 'sa_ratio', self.sa_ratio)
+            print('counter', self.counter, 'new', new, 'reward', reward, 'reward_valid', reward_valid, 'reward_qed', reward_qed, 'reward_logp', reward_logp, 'reward_sa', reward_sa, 'qed_ratio', self.qed_ratio, 'sa_ratio', self.sa_ratio)
             print('smile',smile)
         else:
             new = False
