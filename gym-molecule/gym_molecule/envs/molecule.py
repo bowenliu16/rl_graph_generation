@@ -23,10 +23,11 @@ class MoleculeEnv(gym.Env):
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
-        self.max_atom = 60 # allow for batch calculation, zero padding for smaller molecule
+        self.max_atom = 30 # allow for batch calculation, zero padding for smaller molecule
         self.max_action = 200
-        self.qed_ratio = 15
-        self.sa_ratio = 1
+        self.logp_ratio = 5
+        self.qed_ratio = 1
+        self.sa_ratio = -0.1
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
         self.observation_space = {}
         self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
@@ -58,11 +59,11 @@ class MoleculeEnv(gym.Env):
         # calculate intermediate rewards
         if self.check_valency():
             if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
-                reward_step = 0.1
+                reward_step = 1/self.max_atom
             else:
-                reward_step = -0.1
+                reward_step = -1/self.max_atom
         else:
-            reward_step = -0.1  # arbitrary choice
+            reward_step = -1/self.max_atom  # arbitrary choice
             self.mol = self.mol_old
 
         # calculate terminal rewards
@@ -72,19 +73,20 @@ class MoleculeEnv(gym.Env):
             # check chemical validity of final molecule (valency, as well as
             # other rdkit molecule checks, such as aromaticity)
             if not self.check_chemical_validity():
-                reward_valid = -10 # arbitrary choice
+                reward_valid = -1 # arbitrary choice
                 reward_qed = 0
                 reward_logp = 0
                 reward_sa = 0
                 # reward_cycle = 0
             else:   # these metrics only work for valid molecules
                 # drug likeness metric to optimize. qed can have values [0, 1]
-                reward_valid = 0
+                reward_valid = 1
                 try:
-                    reward_qed = 5**qed(self.mol)    # arbitrary choice of exponent
+                    # reward_qed = 5**qed(self.mol)    # arbitrary choice of exponent
+                    reward_qed = qed(self.mol)
                 # log p. Assume we want to increase log p. log p typically
                 # have values between -3 and 7
-                    reward_logp = Chem.Crippen.MolLogP(self.mol)    # arbitrary choice
+                    reward_logp = Chem.Crippen.MolLogP(self.mol)/self.mol.GetNumAtoms()    # arbitrary choice
                     s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
                     m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
                     reward_sa = calculateScore(m) # lower better
@@ -111,9 +113,11 @@ class MoleculeEnv(gym.Env):
             new = True # end of episode
             # reward = reward_step + reward_valid + reward_logp +reward_qed*self.qed_ratio
             # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
-            reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
+            # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
+            reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
             smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-            print('counter', self.counter, 'new', new, 'reward', reward, 'reward_valid', reward_valid, 'reward_qed', reward_qed, 'reward_logp', reward_logp, 'reward_sa', reward_sa, 'qed_ratio', self.qed_ratio, 'sa_ratio', self.sa_ratio)
+            print('counter', self.counter, 'new', new, 'reward', reward)
+            print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
             print('smile',smile)
         else:
             new = False
