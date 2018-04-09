@@ -258,9 +258,9 @@ def learn(env, policy_fn, *,
         logger.log(fmt_row(13, meanlosses))
         for (lossval, name) in zipsame(meanlosses, loss_names):
             logger.record_tabular("loss_"+name, lossval)
-            writer.add_scalar("loss_"+name, lossval, iters_so_far)
+            # writer.add_scalar("loss_"+name, lossval, iters_so_far)
         logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
-        writer.add_scalar("ev_tdlam_before", explained_variance(vpredbefore, tdlamret), iters_so_far)
+        # writer.add_scalar("ev_tdlam_before", explained_variance(vpredbefore, tdlamret), iters_so_far)
         lrlocal = (seg["ep_lens"], seg["ep_rets"]) # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
         lens, rews = map(flatten_lists, zip(*listoflrpairs))
@@ -269,17 +269,17 @@ def learn(env, policy_fn, *,
         logger.record_tabular("EpLenMean", np.mean(lenbuffer))
         logger.record_tabular("EpRewMean", np.mean(rewbuffer))
         logger.record_tabular("EpThisIter", len(lens))
-        writer.add_scalar("EpLenMean", np.mean(lenbuffer),iters_so_far)
-        writer.add_scalar("EpRewMean", np.mean(rewbuffer),iters_so_far)
-        writer.add_scalar("EpThisIter", len(lens), iters_so_far)
+        # writer.add_scalar("EpLenMean", np.mean(lenbuffer),iters_so_far)
+        # writer.add_scalar("EpRewMean", np.mean(rewbuffer),iters_so_far)
+        # writer.add_scalar("EpThisIter", len(lens), iters_so_far)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
         logger.record_tabular("EpisodesSoFar", episodes_so_far)
         logger.record_tabular("TimestepsSoFar", timesteps_so_far)
         logger.record_tabular("TimeElapsed", time.time() - tstart)
-        writer.add_scalar("EpisodesSoFar", episodes_so_far, iters_so_far)
-        writer.add_scalar("TimestepsSoFar", timesteps_so_far, iters_so_far)
-        writer.add_scalar("TimeElapsed", time.time() - tstart, iters_so_far)
+        # writer.add_scalar("EpisodesSoFar", episodes_so_far, iters_so_far)
+        # writer.add_scalar("TimestepsSoFar", timesteps_so_far, iters_so_far)
+        # writer.add_scalar("TimeElapsed", time.time() - tstart, iters_so_far)
         iters_so_far += 1
         if MPI.COMM_WORLD.Get_rank()==0:
             logger.dump_tabular()

@@ -49,12 +49,13 @@ def train(env_id, num_timesteps, seed,writer=None):
 
 def main():
     args = atari_arg_parser().parse_args()
-    writer = SummaryWriter()
+    # writer = SummaryWriter()
     try:
-        train(args.env, num_timesteps=args.num_timesteps, seed=args.seed,writer=writer)
+        train(args.env, num_timesteps=args.num_timesteps, seed=args.seed,writer=None)
     except:
-        writer.export_scalars_to_json("./all_scalars.json")
-        writer.close()
+        # writer.export_scalars_to_json("./all_scalars.json")
+        # writer.close()
+        pass
 
 if __name__ == '__main__':
     main()
