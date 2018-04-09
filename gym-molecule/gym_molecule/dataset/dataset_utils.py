@@ -31,8 +31,11 @@ class gdb_dataset:
     """
     smiles = self.df['smiles'][item]
     mol = Chem.MolFromSmiles(smiles)
-    return mol
+    return mol, smiles
 
 # TESTS
 path = 'gdb13.rand1M.smi.gz'
 dataset = gdb_dataset(path)
+
+print(len(dataset))
+print(dataset[0])

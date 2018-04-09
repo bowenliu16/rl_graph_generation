@@ -14,11 +14,12 @@ class MoleculeEnv(gym.Env):
     # todo: seed()
 
     def __init__(self):
-        possible_atoms = ['C', 'N', 'O']
+        possible_atoms = ['C', 'N', 'O', 'S', 'Cl']
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE]
         self.mol = Chem.RWMol()
         self.possible_atom_types = np.array(possible_atoms)  # dim d_n. Array that
+        self.atom_type_num = len(possible_atoms)
         # contains the possible atom symbols strs
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
@@ -311,13 +312,22 @@ class MoleculeEnv(gym.Env):
         ob['node'] = F
         return ob
 
+    def get_expert(self, dataset, batch_size):
+        ob = {}
+        ac = np.zeros(batch_size,3)
+
+
+
+
+        pass
+
 
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
 
     ob = env.reset()
-    print(ob['adj'])
-    print(ob['node'])
+    print(ob['adj'].shape)
+    print(ob['node'].shape)
 
     env.step(np.array([[0,3,0]]))
     env.step(np.array([[1,4,0]]))

@@ -29,7 +29,7 @@ def train(env_id, num_timesteps, seed,writer=None):
     print(env.observation_space)
     def policy_fn(name, ob_space, ac_space): #pylint: disable=W0613
         # return cnn_policy.CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
-        return gcn_policy.GCNPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
+        return gcn_policy.GCNPolicy(name=name, ob_space=ob_space, ac_space=ac_space, atom_type_num=env.atom_type_num)
     # env = bench.Monitor(env, logger.get_dir() and
     #     osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)

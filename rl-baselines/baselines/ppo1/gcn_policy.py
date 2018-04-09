@@ -77,12 +77,12 @@ def bilinear_multi(emb_1, emb_2, out_dim, name='bilinear'):
 
 class GCNPolicy(object):
     recurrent = False
-    def __init__(self, name, ob_space, ac_space, kind='small'):
+    def __init__(self, name, ob_space, ac_space, kind='small', atom_type_num = None):
         with tf.variable_scope(name):
-            self._init(ob_space, ac_space, kind)
+            self._init(ob_space, ac_space, kind, atom_type_num)
             self.scope = tf.get_variable_scope().name
 
-    def _init(self, ob_space, ac_space, kind):
+    def _init(self, ob_space, ac_space, kind, atom_type_num):
         self.pdtype = MultiCatCategoricalPdType
         ### 0 Get input
         ob = {'adj': U.get_placeholder(name="adj", dtype=tf.float32, shape=[None,ob_space['adj'].shape[0],None,None]),
@@ -99,7 +99,7 @@ class GCNPolicy(object):
         ### 1 only keep effective nodes
         # ob_mask = tf.cast(tf.transpose(tf.reduce_sum(ob['node'],axis=-1),[0,2,1]),dtype=tf.bool) # B*n*1
         ob_len = tf.reduce_sum(tf.squeeze(tf.reduce_sum(ob['node'], axis=-1),axis=-2),axis=-1)  # B
-        ob_len_first = ob_len-3 # todo: add a parameter for 3, number of node types
+        ob_len_first = ob_len-atom_type_num # todo: add a parameter for 3, number of node types
         logits_mask = tf.sequence_mask(ob_len, maxlen=tf.shape(ob['node'])[2]) # mask all valid entry
         logits_first_mask = tf.sequence_mask(ob_len_first,maxlen=tf.shape(ob['node'])[2]) # mask valid entry -3 (rm isolated nodes)
 
@@ -154,14 +154,16 @@ class GCNPolicy(object):
 
         ### 3.3 predict edge type
         # using own prediction
-        self.logits_edge = tf.reshape(bilinear_multi(emb_first,emb_second,out_dim=ob['adj'].get_shape()[1]),[-1,ob_space['node'].shape[2]])
+        self.logits_edge = tf.reshape(bilinear_multi(emb_first,emb_second,out_dim=ob['adj'].get_shape()[1]),[-1,ob['adj'].get_shape()[1]])
         pd_edge = CategoricalPdType(-1).pdfromflat(self.logits_edge)
         ac_edge = pd_edge.sample()
 
         # using ground truth
         self.logits_edge_real = tf.reshape(bilinear_multi(emb_first_real, emb_second_real, out_dim=ob['adj'].get_shape()[1]),
-                                      [-1, ob_space['node'].shape[2]])
+                                      [-1, ob['adj'].get_shape()[1]])
 
+        print('ob_adj', ob['adj'].get_shape(),
+              'ob_node', ob['node'].get_shape())
         print('logits_first', self.logits_first.get_shape(),
               'logits_second',self.logits_second.get_shape(),
               'logits_edge', self.logits_edge.get_shape())
@@ -219,9 +221,11 @@ if __name__ == "__main__":
 
 
     ob_space = {}
+    atom_type = 5
     ob_space['adj'] = gym.Space(shape=[3,5,5])
-    ob_space['node'] = gym.Space(shape=[1,5,3])
-    policy = GCNPolicy(name='policy',ob_space=ob_space,ac_space=None)
+    ob_space['node'] = gym.Space(shape=[1,5,atom_type])
+    ac_space = gym.spaces.MultiDiscrete([10, 10, 3])
+    policy = GCNPolicy(name='policy',ob_space=ob_space,ac_space=ac_space)
 
     stochastic = True
     env = gym.make('molecule-v0')  # in gym format
