@@ -52,8 +52,13 @@ class MoleculeEnv(gym.Env):
         self.counter = 0
 
         ## expert data
-        path = '/Users/jiaxuan/PycharmProjects/rl_graph_generation/gym-molecule/gym_molecule/dataset/gdb13.rand1M.smi.gz'
-        self.dataset = gdb_dataset(path)
+        try:
+            path = '/Users/jiaxuan/PycharmProjects/rl_graph_generation/gym-molecule/gym_molecule/dataset/gdb13.rand1M.smi.gz'
+            self.dataset = gdb_dataset(path)
+        except:
+            path = '/dfs/scratch0/jiaxuanyou0/git/rl_graph_generation/gym-molecule/gym_molecule/dataset/gdb13.rand1M.smi.gz'
+            self.dataset = gdb_dataset(path)
+
 
 
     def step(self, action):
