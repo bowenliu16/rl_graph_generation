@@ -258,19 +258,20 @@ def learn(env, policy_fn, *,
         d = Dataset(dict(ob_adj=ob_adj, ob_node=ob_node, ac=ac, atarg=atarg, vtarg=tdlamret), shuffle=not pi.recurrent)
         optim_batchsize = optim_batchsize or ob_adj.shape[0]
 
-        ## PPO train
-        assign_old_eq_new() # set old parameter values to new parameter values
-        logger.log("Optimizing...")
-        logger.log(fmt_row(13, loss_names))
-        # Here we do a bunch of optimization epochs over the data
-        for _ in range(optim_epochs):
-            losses = [] # list of tuples, each of which gives the loss for a minibatch
-            for batch in d.iterate_once(optim_batchsize):
-                *newlosses, g, debug = lossandgrad(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
-                adam.update(g, optim_stepsize * cur_lrmult)
-                losses.append(newlosses)
-            temp = np.mean(losses, axis=0)
-            logger.log(fmt_row(13, np.mean(losses, axis=0)))
+        if iters_so_far>0:
+            ## PPO train
+            assign_old_eq_new() # set old parameter values to new parameter values
+            logger.log("Optimizing...")
+            logger.log(fmt_row(13, loss_names))
+            # Here we do a bunch of optimization epochs over the data
+            for _ in range(optim_epochs):
+                losses = [] # list of tuples, each of which gives the loss for a minibatch
+                for batch in d.iterate_once(optim_batchsize):
+                    *newlosses, g, debug = lossandgrad(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
+                    adam.update(g, optim_stepsize * cur_lrmult)
+                    losses.append(newlosses)
+                temp = np.mean(losses, axis=0)
+                logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
         ## PPO val
         logger.log("Evaluating losses...")
