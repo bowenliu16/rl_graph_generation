@@ -130,10 +130,8 @@ def learn(env, policy_fn, *,
     # ac = pi.pdtype.sample_placeholder([None])
     # ac = tf.placeholder(dtype=tf.int64,shape=env.action_space.nvec.shape)
     ac = tf.placeholder(dtype=tf.int64, shape=[None,3],name='ac_real')
-    # pi.ac_real = ac
-    # oldpi.ac_real = ac
 
-
+    ## PPO loss
     kloldnew = oldpi.pd.kl(pi.pd)
     ent = pi.pd.entropy()
     meankl = tf.reduce_mean(kloldnew)
@@ -153,8 +151,13 @@ def learn(env, policy_fn, *,
     losses = [pol_surr, pol_entpen, vf_loss, meankl, meanent]
     loss_names = ["pol_surr", "pol_entpen", "vf_loss", "kl", "ent"]
 
+    ## Expert loss
+    loss_expert = -tf.reduce_mean(pi_logp)
+
     var_list = pi.get_trainable_variables()
     var_list_all = pi.get_variables()
+
+    ## debug
     debug={}
     debug['ac'] = ac
     debug['ob_adj'] = ob['adj']
@@ -182,11 +185,17 @@ def learn(env, policy_fn, *,
         debug['w'] = w
 
 
+    ## loss update function
+    lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list)])
     lossandgrad = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list)]+[debug])
+
     adam = MpiAdam(var_list, epsilon=adam_epsilon)
 
     assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
         for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
+
+    compute_losses_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real],
+                                    loss_expert)
     compute_losses = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses)
 
     U.initialize()
@@ -205,6 +214,7 @@ def learn(env, policy_fn, *,
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
 
+    ## start training
     while True:
         if callback: callback(locals(), globals())
         if max_timesteps and timesteps_so_far >= max_timesteps:
@@ -224,7 +234,20 @@ def learn(env, policy_fn, *,
             raise NotImplementedError
 
         logger.log("********** Iteration %i ************"%iters_so_far)
+        ## Expert train
+        losses = []  # list of tuples, each of which gives the loss for a minibatch
+        for _ in range(optim_epochs*2):
+            ob_expert, ac_expert = env.get_expert(optim_batchsize)
+            losses_expert, g = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
+            adam.update(g, optim_stepsize * cur_lrmult)
+            losses.append(losses_expert)
+        loss_expert = np.mean(losses, axis=0, keepdims=True)
+        logger.log(fmt_row(13, loss_expert))
 
+
+
+
+        ## PPO
         seg = seg_gen.__next__()
         add_vtarg_and_adv(seg, gamma, lam)
 
@@ -235,8 +258,7 @@ def learn(env, policy_fn, *,
         d = Dataset(dict(ob_adj=ob_adj, ob_node=ob_node, ac=ac, atarg=atarg, vtarg=tdlamret), shuffle=not pi.recurrent)
         optim_batchsize = optim_batchsize or ob_adj.shape[0]
 
-        #if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob) # update running mean/std for policy
-
+        ## PPO train
         assign_old_eq_new() # set old parameter values to new parameter values
         logger.log("Optimizing...")
         logger.log(fmt_row(13, loss_names))
@@ -247,8 +269,10 @@ def learn(env, policy_fn, *,
                 *newlosses, g, debug = lossandgrad(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                 adam.update(g, optim_stepsize * cur_lrmult)
                 losses.append(newlosses)
+            temp = np.mean(losses, axis=0)
             logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
+        ## PPO val
         logger.log("Evaluating losses...")
         losses = []
         for batch in d.iterate_once(optim_batchsize):
@@ -256,6 +280,7 @@ def learn(env, policy_fn, *,
             losses.append(newlosses)
         meanlosses,_,_ = mpi_moments(losses, axis=0)
         logger.log(fmt_row(13, meanlosses))
+        logger.record_tabular("loss_expert", loss_expert)
         for (lossval, name) in zipsame(meanlosses, loss_names):
             logger.record_tabular("loss_"+name, lossval)
             # writer.add_scalar("loss_"+name, lossval, iters_so_far)
@@ -283,6 +308,9 @@ def learn(env, policy_fn, *,
         iters_so_far += 1
         if MPI.COMM_WORLD.Get_rank()==0:
             logger.dump_tabular()
+
+
+
 
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]

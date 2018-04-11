@@ -7,7 +7,22 @@ from rdkit.Chem.Descriptors import qed
 import gym_molecule
 import copy
 import networkx as nx
-from .sascorer import calculateScore
+from gym_molecule.envs.sascorer import calculateScore
+from gym_molecule.dataset.dataset_utils import gdb_dataset,mol_to_nx,nx_to_mol
+import random
+
+from contextlib import contextmanager
+import sys, os
+
+@contextmanager
+def nostdout():
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
 
 class MoleculeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -16,7 +31,7 @@ class MoleculeEnv(gym.Env):
     def __init__(self):
         possible_atoms = ['C', 'N', 'O', 'S', 'Cl']
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
-                          Chem.rdchem.BondType.TRIPLE]
+                          Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.mol = Chem.RWMol()
         self.possible_atom_types = np.array(possible_atoms)  # dim d_n. Array that
         self.atom_type_num = len(possible_atoms)
@@ -36,6 +51,10 @@ class MoleculeEnv(gym.Env):
 
         self.counter = 0
 
+        ## expert data
+        path = '/Users/jiaxuan/PycharmProjects/rl_graph_generation/gym-molecule/gym_molecule/dataset/gdb13.rand1M.smi.gz'
+        self.dataset = gdb_dataset(path)
+
 
     def step(self, action):
         """
@@ -49,6 +68,7 @@ class MoleculeEnv(gym.Env):
         # print('num atoms',self.mol.GetNumAtoms())
         total_atoms = self.mol.GetNumAtoms()
         # take action
+
         if action[0, 1] >= total_atoms:
             self._add_atom(action[0, 1] - total_atoms)  # add new node
             action[0, 1] = total_atoms  # new node id
@@ -312,14 +332,71 @@ class MoleculeEnv(gym.Env):
         ob['node'] = F
         return ob
 
-    def get_expert(self, dataset, batch_size):
+
+    def get_expert(self, batch_size):
         ob = {}
-        ac = np.zeros(batch_size,3)
+        atom_type_num = len(self.possible_atom_types)
+        bond_type_num = len(self.possible_bond_types)
+        ob['node'] = np.zeros((batch_size, 1, self.max_atom, atom_type_num))
+        ob['adj'] = np.zeros((batch_size, bond_type_num, self.max_atom, self.max_atom))
 
+        ac = np.zeros((batch_size, 3))
+        ### select molecule
+        dataset_len = len(self.dataset)
+        np.random.randint(0,dataset_len,size=batch_size)
+        for i in range(batch_size):
+            ### get a subgraph
+            mol = self.dataset[i]
+            Chem.SanitizeMol(mol,sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+            graph = mol_to_nx(mol)
+            edges = graph.edges()
+            edges_sub_len = random.randint(1,len(edges))
+            edges_sub = random.sample(edges,k=edges_sub_len)
+            graph_sub = nx.Graph(edges_sub)
+            graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)
+            ### random pick an edge from the subgraph, then remove it
+            edge_sample = random.sample(graph_sub.edges(),k=1)
+            graph_sub.remove_edges_from(edge_sample)
+            graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)
+            edge_sample = edge_sample[0] # get value
+            ### get action
+            graph_sub_nodes = graph_sub.nodes()
+            if edge_sample[0] in graph_sub_nodes and edge_sample[1] in graph_sub_nodes:
+                node1 = graph_sub_nodes.index(edge_sample[0])
+                node2 = graph_sub_nodes.index(edge_sample[1])
+            elif edge_sample[0] in graph_sub_nodes:
+                node1 = graph_sub_nodes.index(edge_sample[0])
+                node2 = np.argmax(
+                    graph.node[edge_sample[1]]['symbol'] == self.possible_atom_types) + graph_sub.number_of_nodes()
+            elif edge_sample[1] in graph_sub_nodes:
+                node1 = graph_sub_nodes.index(edge_sample[1])
+                node2 = np.argmax(
+                    graph.node[edge_sample[0]]['symbol'] == self.possible_atom_types) + graph_sub.number_of_nodes()
+            else:
+                print('Expert policy error!')
+            edge_type = np.argmax(graph[edge_sample[0]][edge_sample[1]]['bond_type'] == self.possible_bond_types)
+            ac[i,:] = [node1,node2,edge_type]
 
+            ### get observation
+            n = graph_sub.number_of_nodes()
+            for node_id, node in enumerate(graph_sub_nodes):
+                float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
+                assert float_array.sum() != 0
+                ob['node'][i, 0, node_id, :] = float_array
+            ob['node'][i ,0, n:n + atom_type_num, :] = np.eye(atom_type_num)
 
+            for j in range(bond_type_num):
+                ob['adj'][i, j, :n + atom_type_num, :n + atom_type_num] = np.eye(n + atom_type_num)
+            for edge in graph_sub.edges():
+                begin_idx = edge[0]
+                end_idx = edge[1]
+                bond_type = graph[begin_idx][end_idx]['bond_type']
+                float_array = (bond_type == self.possible_bond_types).astype(float)
+                assert float_array.sum() != 0
+                ob['adj'][i, :, begin_idx, end_idx] = float_array
+                ob['adj'][i, :, end_idx, begin_idx] = float_array
 
-        pass
+        return ob,ac
 
 
 if __name__ == '__main__':
@@ -329,18 +406,22 @@ if __name__ == '__main__':
     print(ob['adj'].shape)
     print(ob['node'].shape)
 
-    env.step(np.array([[0,3,0]]))
-    env.step(np.array([[1,4,0]]))
-    env.step(np.array([[0,4,0]]))
-    env.step(np.array([[0,4,0]]))
+    ob,ac = env.get_expert(4)
+    print(ob)
+    print(ac)
 
-    s = Chem.MolToSmiles(env.mol, isomericSmiles=True)
-    m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
-
-    ring = m.GetRingInfo()
-    print('ring',ring.NumAtomRings(0))
-    s = calculateScore(m)
-    print(s)
+    # env.step(np.array([[0,3,0]]))
+    # env.step(np.array([[1,4,0]]))
+    # env.step(np.array([[0,4,0]]))
+    # env.step(np.array([[0,4,0]]))
+    #
+    # s = Chem.MolToSmiles(env.mol, isomericSmiles=True)
+    # m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+    #
+    # ring = m.GetRingInfo()
+    # print('ring',ring.NumAtomRings(0))
+    # s = calculateScore(m)
+    # print(s)
 
     # ac = np.array([[0,3,0]])
     # print(ac.shape)
