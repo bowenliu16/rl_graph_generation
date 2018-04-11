@@ -234,15 +234,16 @@ def learn(env, policy_fn, *,
             raise NotImplementedError
 
         logger.log("********** Iteration %i ************"%iters_so_far)
-        ## Expert train
-        losses = []  # list of tuples, each of which gives the loss for a minibatch
-        for _ in range(optim_epochs*2):
-            ob_expert, ac_expert = env.get_expert(optim_batchsize)
-            losses_expert, g = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
-            adam.update(g, optim_stepsize * cur_lrmult)
-            losses.append(losses_expert)
-        loss_expert = np.mean(losses, axis=0, keepdims=True)
-        logger.log(fmt_row(13, loss_expert))
+        if iters_so_far<1000:
+            ## Expert train
+            losses = []  # list of tuples, each of which gives the loss for a minibatch
+            for _ in range(optim_epochs*2):
+                ob_expert, ac_expert = env.get_expert(optim_batchsize)
+                losses_expert, g = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
+                adam.update(g, optim_stepsize * cur_lrmult)
+                losses.append(losses_expert)
+            loss_expert = np.mean(losses, axis=0, keepdims=True)
+            logger.log(fmt_row(13, loss_expert))
 
 
 
@@ -258,7 +259,7 @@ def learn(env, policy_fn, *,
         d = Dataset(dict(ob_adj=ob_adj, ob_node=ob_node, ac=ac, atarg=atarg, vtarg=tdlamret), shuffle=not pi.recurrent)
         optim_batchsize = optim_batchsize or ob_adj.shape[0]
 
-        if iters_so_far>0:
+        if iters_so_far>=1000:
             ## PPO train
             assign_old_eq_new() # set old parameter values to new parameter values
             logger.log("Optimizing...")
