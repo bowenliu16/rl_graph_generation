@@ -1,10 +1,10 @@
 import gym
-from gym import error, spaces, utils
-from gym.utils import seeding
+# from gym import error, spaces, utils
+# from gym.utils import seeding
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem.Descriptors import qed
-import gym_molecule
+# import gym_molecule
 import copy
 import networkx as nx
 from gym_molecule.envs.sascorer import calculateScore
@@ -53,10 +53,16 @@ class MoleculeEnv(gym.Env):
 
         ## expert data
         try:
-            path = '/Users/jiaxuan/PycharmProjects/rl_graph_generation/gym-molecule/gym_molecule/dataset/gdb13.rand1M.smi.gz'
+            # path = '/Users/jiaxuan/PycharmProjects/rl_graph_generation/gym-molecule/gym_molecule/dataset/gdb13.rand1M.smi.gz'
+            cwd = os.path.dirname(__file__)
+            path = os.path.join(os.path.dirname(cwd), 'dataset',
+                                'gdb13.rand1M.smi.gz')
             self.dataset = gdb_dataset(path)
         except:
-            path = '/dfs/scratch0/jiaxuanyou0/git/rl_graph_generation/gym-molecule/gym_molecule/dataset/gdb13.rand1M.smi.gz'
+            # path = '/dfs/scratch0/jiaxuanyou0/git/rl_graph_generation/gym-molecule/gym_molecule/dataset/gdb13.rand1M.smi.gz'
+            cwd = os.path.dirname(__file__)
+            path = os.path.join(os.path.dirname(cwd), 'dataset',
+                                'gdb13.rand1M.smi.gz')
             self.dataset = gdb_dataset(path)
 
 
