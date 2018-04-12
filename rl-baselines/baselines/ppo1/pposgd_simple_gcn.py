@@ -286,8 +286,11 @@ def learn(env, policy_fn, *,
         logger.record_tabular("loss_expert", loss_expert)
         logger.record_tabular('grad_expert_min',np.amin(g_expert))
         logger.record_tabular('grad_expert_max',np.amax(g_expert))
+        logger.record_tabular('grad_expert_norm', np.linalg.norm(g_expert))
         logger.record_tabular('grad_rl_min', np.amin(g))
         logger.record_tabular('grad_rl_max', np.amax(g))
+        logger.record_tabular('grad_rl_norm', np.linalg.norm(g))
+
         for (lossval, name) in zipsame(meanlosses, loss_names):
             logger.record_tabular("loss_"+name, lossval)
             # writer.add_scalar("loss_"+name, lossval, iters_so_far)
