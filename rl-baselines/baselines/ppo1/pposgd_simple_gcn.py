@@ -243,7 +243,7 @@ def learn(env, policy_fn, *,
                 adam.update(g_expert, optim_stepsize * cur_lrmult)
                 losses.append(losses_expert)
             loss_expert = np.mean(losses, axis=0, keepdims=True)
-            logger.log(fmt_row(13, loss_expert))
+            # logger.log(fmt_row(13, loss_expert))
 
 
 
@@ -282,7 +282,12 @@ def learn(env, policy_fn, *,
             losses.append(newlosses)
         meanlosses,_,_ = mpi_moments(losses, axis=0)
         logger.log(fmt_row(13, meanlosses))
+
         logger.record_tabular("loss_expert", loss_expert)
+        logger.record_tabular('grad_expert_min',np.amin(g_expert))
+        logger.record_tabular('grad_expert_max',np.amax(g_expert))
+        logger.record_tabular('grad_rl_min', np.amin(g))
+        logger.record_tabular('grad_rl_max', np.amax(g))
         for (lossval, name) in zipsame(meanlosses, loss_names):
             logger.record_tabular("loss_"+name, lossval)
             # writer.add_scalar("loss_"+name, lossval, iters_so_far)

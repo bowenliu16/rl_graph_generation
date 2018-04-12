@@ -19,4 +19,4 @@
 ## Run
 
 - cd into `rl-baselines/baselines/ppo1`, then run `run_molecule.py`
-- The code is using CPU solely. To allow for multiple processing, please run `mpirun -np 8 python run_molecule.py` (8 processes).
+- The code is using CPU solely. To allow for multiple processing, please run `mpirun -np 8 python run_molecule.py 2>/dev/null` (8 processes, and don't show warning info!!).
