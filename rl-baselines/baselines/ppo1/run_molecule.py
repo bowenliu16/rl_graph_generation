@@ -71,7 +71,7 @@ def main():
     args = atari_arg_parser().parse_args()
     # only keep first worker result in tensorboard
     if MPI.COMM_WORLD.Get_rank() == 0:
-        writer = SummaryWriter(comment=args.name)
+        writer = SummaryWriter(comment='_'+args.name)
     else:
         writer = None
     try:

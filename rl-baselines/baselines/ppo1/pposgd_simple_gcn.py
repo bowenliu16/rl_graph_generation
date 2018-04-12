@@ -292,20 +292,23 @@ def learn(env, policy_fn, *,
         logger.record_tabular('grad_rl_norm', np.linalg.norm(g))
         logger.record_tabular('learning_rate', optim_stepsize * cur_lrmult)
 
-        writer.add_scalar("loss_expert", loss_expert, iters_so_far)
-        writer.add_scalar('grad_expert_min', np.amin(g_expert), iters_so_far)
-        writer.add_scalar('grad_expert_max', np.amax(g_expert), iters_so_far)
-        writer.add_scalar('grad_expert_norm', np.linalg.norm(g_expert), iters_so_far)
-        writer.add_scalar('grad_rl_min', np.amin(g), iters_so_far)
-        writer.add_scalar('grad_rl_max', np.amax(g), iters_so_far)
-        writer.add_scalar('grad_rl_norm', np.linalg.norm(g), iters_so_far)
-        writer.add_scalar('learning_rate', optim_stepsize * cur_lrmult, iters_so_far)
+        if writer is not None:
+            writer.add_scalar("loss_expert", loss_expert, iters_so_far)
+            writer.add_scalar('grad_expert_min', np.amin(g_expert), iters_so_far)
+            writer.add_scalar('grad_expert_max', np.amax(g_expert), iters_so_far)
+            writer.add_scalar('grad_expert_norm', np.linalg.norm(g_expert), iters_so_far)
+            writer.add_scalar('grad_rl_min', np.amin(g), iters_so_far)
+            writer.add_scalar('grad_rl_max', np.amax(g), iters_so_far)
+            writer.add_scalar('grad_rl_norm', np.linalg.norm(g), iters_so_far)
+            writer.add_scalar('learning_rate', optim_stepsize * cur_lrmult, iters_so_far)
 
         for (lossval, name) in zipsame(meanlosses, loss_names):
             logger.record_tabular("loss_"+name, lossval)
-            writer.add_scalar("loss_"+name, lossval, iters_so_far)
+            if writer is not None:
+                writer.add_scalar("loss_"+name, lossval, iters_so_far)
         logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
-        writer.add_scalar("ev_tdlam_before", explained_variance(vpredbefore, tdlamret), iters_so_far)
+        if writer is not None:
+            writer.add_scalar("ev_tdlam_before", explained_variance(vpredbefore, tdlamret), iters_so_far)
         lrlocal = (seg["ep_lens"], seg["ep_rets"]) # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
         lens, rews = map(flatten_lists, zip(*listoflrpairs))
@@ -314,17 +317,19 @@ def learn(env, policy_fn, *,
         logger.record_tabular("EpLenMean", np.mean(lenbuffer))
         logger.record_tabular("EpRewMean", np.mean(rewbuffer))
         logger.record_tabular("EpThisIter", len(lens))
-        writer.add_scalar("EpLenMean", np.mean(lenbuffer),iters_so_far)
-        writer.add_scalar("EpRewMean", np.mean(rewbuffer),iters_so_far)
-        writer.add_scalar("EpThisIter", len(lens), iters_so_far)
+        if writer is not None:
+            writer.add_scalar("EpLenMean", np.mean(lenbuffer),iters_so_far)
+            writer.add_scalar("EpRewMean", np.mean(rewbuffer),iters_so_far)
+            writer.add_scalar("EpThisIter", len(lens), iters_so_far)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
         logger.record_tabular("EpisodesSoFar", episodes_so_far)
         logger.record_tabular("TimestepsSoFar", timesteps_so_far)
         logger.record_tabular("TimeElapsed", time.time() - tstart)
-        writer.add_scalar("EpisodesSoFar", episodes_so_far, iters_so_far)
-        writer.add_scalar("TimestepsSoFar", timesteps_so_far, iters_so_far)
-        writer.add_scalar("TimeElapsed", time.time() - tstart, iters_so_far)
+        if writer is not None:
+            writer.add_scalar("EpisodesSoFar", episodes_so_far, iters_so_far)
+            writer.add_scalar("TimestepsSoFar", timesteps_so_far, iters_so_far)
+            writer.add_scalar("TimeElapsed", time.time() - tstart, iters_so_far)
         iters_so_far += 1
         if MPI.COMM_WORLD.Get_rank()==0:
             logger.dump_tabular()
