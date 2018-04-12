@@ -29,9 +29,9 @@ class MoleculeEnv(gym.Env):
     # todo: seed()
 
     def __init__(self):
-        # possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
-        possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
-                          'Br']  # ZINC
+        possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
+        # possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
+        #                   'Br']  # ZINC
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.mol = Chem.RWMol()
@@ -41,8 +41,8 @@ class MoleculeEnv(gym.Env):
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
-        # self.max_atom = 13 + len(possible_atoms) # gdb 13
-        self.max_atom = 38 + len(possible_atoms) # ZINC
+        self.max_atom = 13 + len(possible_atoms) # gdb 13
+        # self.max_atom = 38 + len(possible_atoms) # ZINC
         self.max_action = 200
         self.logp_ratio = 1
         self.qed_ratio = 1
