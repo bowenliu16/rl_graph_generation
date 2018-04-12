@@ -29,7 +29,9 @@ class MoleculeEnv(gym.Env):
     # todo: seed()
 
     def __init__(self):
-        possible_atoms = ['C', 'N', 'O', 'S', 'Cl']
+        possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
+        # possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
+        #                   'Br']  # ZINC
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.mol = Chem.RWMol()
@@ -54,7 +56,9 @@ class MoleculeEnv(gym.Env):
         ## load expert data
         cwd = os.path.dirname(__file__)
         path = os.path.join(os.path.dirname(cwd), 'dataset',
-                            'gdb13.rand1M.smi.gz')
+                            'gdb13.rand1M.smi.gz')  # gdb 13
+        # path = os.path.join(os.path.dirname(cwd), 'dataset',
+        #                     '250k_rndm_zinc_drugs_clean.smi')  # ZINC
         self.dataset = gdb_dataset(path)
 
 
