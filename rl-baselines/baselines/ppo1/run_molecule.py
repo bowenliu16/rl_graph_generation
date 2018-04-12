@@ -7,7 +7,7 @@ from baselines.common import set_global_seeds
 from baselines import logger
 # from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # from baselines.common.cmd_util import atari_arg_parser
-# from tensorboardX import SummaryWriter
+from tensorboardX import SummaryWriter
 
 
 import gym
@@ -64,16 +64,21 @@ def atari_arg_parser():
                         default='BreakoutNoFrameskip-v4')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--num-timesteps', type=int, default=int(10e6))
+    parser.add_argument('--name', type=str, default='test')
     return parser
 
 def main():
     args = atari_arg_parser().parse_args()
-    # writer = SummaryWriter()
+    # only keep first worker result in tensorboard
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        writer = SummaryWriter(comment=args.name)
+    else:
+        writer = None
     try:
-        train(args.env, num_timesteps=args.num_timesteps, seed=args.seed,writer=None)
+        train(args.env, num_timesteps=args.num_timesteps, seed=args.seed,writer=writer)
     except:
-        # writer.export_scalars_to_json("./all_scalars.json")
-        # writer.close()
+        writer.export_scalars_to_json("./all_scalars.json")
+        writer.close()
         pass
 
 if __name__ == '__main__':
