@@ -44,7 +44,7 @@ class MoleculeEnv(gym.Env):
         # self.max_atom = 13 + len(possible_atoms) # gdb 13
         self.max_atom = 38 + len(possible_atoms) # ZINC
         self.max_action = 200
-        self.logp_ratio = 5
+        self.logp_ratio = 1
         self.qed_ratio = 1
         self.sa_ratio = -0.1
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
