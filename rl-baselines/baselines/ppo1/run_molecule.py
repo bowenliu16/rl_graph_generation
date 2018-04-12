@@ -2,16 +2,16 @@
 
 from mpi4py import MPI
 from baselines.common import set_global_seeds
-from baselines import bench
-import os.path as osp
+# from baselines import bench
+# import os.path as osp
 from baselines import logger
-from baselines.common.atari_wrappers import make_atari, wrap_deepmind
-from baselines.common.cmd_util import atari_arg_parser
-from tensorboardX import SummaryWriter
+# from baselines.common.atari_wrappers import make_atari, wrap_deepmind
+# from baselines.common.cmd_util import atari_arg_parser
+# from tensorboardX import SummaryWriter
 
 
 import gym
-import gym_molecule
+# import gym_molecule
 
 def train(env_id, num_timesteps, seed,writer=None):
     from baselines.ppo1 import pposgd_simple_gcn, gcn_policy
@@ -46,6 +46,25 @@ def train(env_id, num_timesteps, seed,writer=None):
         schedule='linear', writer=writer
     )
     env.close()
+
+def arg_parser():
+    """
+    Create an empty argparse.ArgumentParser.
+    """
+    import argparse
+    return argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+def atari_arg_parser():
+    """
+    Create an argparse.ArgumentParser for run_atari.py.
+    """
+    parser = arg_parser()
+    parser.add_argument('--env', help='environment ID',
+                        default='BreakoutNoFrameskip-v4')
+    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+    parser.add_argument('--num-timesteps', type=int, default=int(10e6))
+    return parser
 
 def main():
     args = atari_arg_parser().parse_args()
