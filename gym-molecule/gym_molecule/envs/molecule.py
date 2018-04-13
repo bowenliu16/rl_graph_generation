@@ -102,7 +102,7 @@ class MoleculeEnv(gym.Env):
             # check chemical validity of final molecule (valency, as well as
             # other rdkit molecule checks, such as aromaticity)
             if not self.check_chemical_validity():
-                reward_valid = -1 # arbitrary choice
+                reward_valid = -10 # arbitrary choice
                 reward_qed = 0
                 reward_logp = 0
                 reward_sa = 0
@@ -136,6 +136,9 @@ class MoleculeEnv(gym.Env):
                     # else:
                     #     reward_sa = 0
                 except:
+                    reward_qed = -1
+                    reward_logp = -1
+                    reward_sa = 10
                     print('error')
 
                 #TODO(Bowen): synthetic accessibility metric to optimize
