@@ -9,7 +9,7 @@ from mpi4py import MPI
 from collections import deque
 from tensorboardX import SummaryWriter
 
-def traj_segment_generator(pi, env, horizon, stochastic):
+def traj_segment_generator(args, pi, env, horizon, stochastic):
     t = 0
     ac = env.action_space.sample() # not used, just so we have the datatype
     new = True # marks if we're on first timestep of an episode
@@ -71,12 +71,15 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
+            info = env.get_info()
+            with open('molecule_gen/'+args.name+'.csv', 'a') as f:
+                f.write('{},{},{},{},{},{},{},{}\n'.format(info['smile'],info['reward_qed'],info['reward_logp'],info['reward_sa'],info['reward_sum'],info['qed_ratio'],info['logp_ratio'],info['sa_ratio']))
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             cur_ep_ret = 0
             cur_ep_len = 0
             ob = env.reset()
-            # print('-------reset-call-----------')
+
         t += 1
 
 def add_vtarg_and_adv(seg, gamma, lam):
@@ -99,7 +102,7 @@ def add_vtarg_and_adv(seg, gamma, lam):
 
 
 
-def learn(env, policy_fn, *,
+def learn(args,env, policy_fn, *,
         timesteps_per_actorbatch, # timesteps per actor per update
         clip_param, entcoeff, # clipping parameter epsilon, entropy coeff
         optim_epochs, optim_stepsize, optim_batchsize,# optimization hypers
@@ -187,7 +190,7 @@ def learn(env, policy_fn, *,
 
     ## loss update function
     lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list)])
-    lossandgrad = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list)]+[debug])
+    lossandgrad = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list)])
 
     adam = MpiAdam(var_list, epsilon=adam_epsilon)
 
@@ -203,14 +206,15 @@ def learn(env, policy_fn, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch, stochastic=True)
-
     episodes_so_far = 0
     timesteps_so_far = 0
     iters_so_far = 0
     tstart = time.time()
     lenbuffer = deque(maxlen=100) # rolling buffer for episode lengths
     rewbuffer = deque(maxlen=100) # rolling buffer for episode rewards
+
+    seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, stochastic=True)
+
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
 
@@ -233,7 +237,7 @@ def learn(env, policy_fn, *,
         else:
             raise NotImplementedError
 
-        logger.log("********** Iteration %i ************"%iters_so_far)
+        # logger.log("********** Iteration %i ************"%iters_so_far)
         if iters_so_far>=0:
             ## Expert train
             losses = []  # list of tuples, each of which gives the loss for a minibatch
@@ -244,8 +248,6 @@ def learn(env, policy_fn, *,
                 losses.append(losses_expert)
             loss_expert = np.mean(losses, axis=0, keepdims=True)
             # logger.log(fmt_row(13, loss_expert))
-
-
 
 
         ## PPO
@@ -262,35 +264,35 @@ def learn(env, policy_fn, *,
         if iters_so_far>=0:
             ## PPO train
             assign_old_eq_new() # set old parameter values to new parameter values
-            logger.log("Optimizing...")
-            logger.log(fmt_row(13, loss_names))
+            # logger.log("Optimizing...")
+            # logger.log(fmt_row(13, loss_names))
             # Here we do a bunch of optimization epochs over the data
             for _ in range(optim_epochs):
                 losses = [] # list of tuples, each of which gives the loss for a minibatch
                 for batch in d.iterate_once(optim_batchsize):
-                    *newlosses, g, debug = lossandgrad(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
+                    *newlosses, g = lossandgrad(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                     adam.update(g, optim_stepsize * cur_lrmult)
                     losses.append(newlosses)
                 temp = np.mean(losses, axis=0)
-                logger.log(fmt_row(13, np.mean(losses, axis=0)))
+                # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
         ## PPO val
-        logger.log("Evaluating losses...")
+        # logger.log("Evaluating losses...")
         losses = []
         for batch in d.iterate_once(optim_batchsize):
             newlosses = compute_losses(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
             losses.append(newlosses)
         meanlosses,_,_ = mpi_moments(losses, axis=0)
-        logger.log(fmt_row(13, meanlosses))
+        # logger.log(fmt_row(13, meanlosses))
 
-        logger.record_tabular("loss_expert", loss_expert)
-        logger.record_tabular('grad_expert_min',np.amin(g_expert))
-        logger.record_tabular('grad_expert_max',np.amax(g_expert))
-        logger.record_tabular('grad_expert_norm', np.linalg.norm(g_expert))
-        logger.record_tabular('grad_rl_min', np.amin(g))
-        logger.record_tabular('grad_rl_max', np.amax(g))
-        logger.record_tabular('grad_rl_norm', np.linalg.norm(g))
-        logger.record_tabular('learning_rate', optim_stepsize * cur_lrmult)
+        # logger.record_tabular("loss_expert", loss_expert)
+        # logger.record_tabular('grad_expert_min',np.amin(g_expert))
+        # logger.record_tabular('grad_expert_max',np.amax(g_expert))
+        # logger.record_tabular('grad_expert_norm', np.linalg.norm(g_expert))
+        # logger.record_tabular('grad_rl_min', np.amin(g))
+        # logger.record_tabular('grad_rl_max', np.amax(g))
+        # logger.record_tabular('grad_rl_norm', np.linalg.norm(g))
+        # logger.record_tabular('learning_rate', optim_stepsize * cur_lrmult)
 
         if writer is not None:
             writer.add_scalar("loss_expert", loss_expert, iters_so_far)
@@ -303,10 +305,10 @@ def learn(env, policy_fn, *,
             writer.add_scalar('learning_rate', optim_stepsize * cur_lrmult, iters_so_far)
 
         for (lossval, name) in zipsame(meanlosses, loss_names):
-            logger.record_tabular("loss_"+name, lossval)
+            # logger.record_tabular("loss_"+name, lossval)
             if writer is not None:
                 writer.add_scalar("loss_"+name, lossval, iters_so_far)
-        logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
+        # logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
         if writer is not None:
             writer.add_scalar("ev_tdlam_before", explained_variance(vpredbefore, tdlamret), iters_so_far)
         lrlocal = (seg["ep_lens"], seg["ep_rets"]) # local values
@@ -314,25 +316,25 @@ def learn(env, policy_fn, *,
         lens, rews = map(flatten_lists, zip(*listoflrpairs))
         lenbuffer.extend(lens)
         rewbuffer.extend(rews)
-        logger.record_tabular("EpLenMean", np.mean(lenbuffer))
-        logger.record_tabular("EpRewMean", np.mean(rewbuffer))
-        logger.record_tabular("EpThisIter", len(lens))
+        # logger.record_tabular("EpLenMean", np.mean(lenbuffer))
+        # logger.record_tabular("EpRewMean", np.mean(rewbuffer))
+        # logger.record_tabular("EpThisIter", len(lens))
         if writer is not None:
             writer.add_scalar("EpLenMean", np.mean(lenbuffer),iters_so_far)
             writer.add_scalar("EpRewMean", np.mean(rewbuffer),iters_so_far)
             writer.add_scalar("EpThisIter", len(lens), iters_so_far)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
-        logger.record_tabular("EpisodesSoFar", episodes_so_far)
-        logger.record_tabular("TimestepsSoFar", timesteps_so_far)
-        logger.record_tabular("TimeElapsed", time.time() - tstart)
+        # logger.record_tabular("EpisodesSoFar", episodes_so_far)
+        # logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+        # logger.record_tabular("TimeElapsed", time.time() - tstart)
         if writer is not None:
             writer.add_scalar("EpisodesSoFar", episodes_so_far, iters_so_far)
             writer.add_scalar("TimestepsSoFar", timesteps_so_far, iters_so_far)
             writer.add_scalar("TimeElapsed", time.time() - tstart, iters_so_far)
         iters_so_far += 1
-        if MPI.COMM_WORLD.Get_rank()==0:
-            logger.dump_tabular()
+        # if MPI.COMM_WORLD.Get_rank()==0:
+        #     logger.dump_tabular()
 
 
 

@@ -268,6 +268,20 @@ class MoleculeEnv(gym.Env):
         except ValueError:
             return False
 
+    def get_info(self):
+        info = {}
+        info['smile'] = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+        info['reward_qed'] = qed(self.mol) * self.qed_ratio
+        info['reward_logp'] = Chem.Crippen.MolLogP(self.mol) / self.mol.GetNumAtoms() * self.logp_ratio  # arbitrary choice
+        s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+        m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+        info['reward_sa'] = calculateScore(m) * self.sa_ratio  # lower better
+        info['reward_sum'] = info['reward_qed'] + info['reward_logp'] + info['reward_sa']
+        info['qed_ratio'] = self.qed_ratio
+        info['logp_ratio'] = self.logp_ratio
+        info['sa_ratio'] = self.sa_ratio
+        return info
+
     def get_matrices(self):
         """
         Get the adjacency matrix, edge feature matrix and, node feature matrix
