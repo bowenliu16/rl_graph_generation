@@ -29,9 +29,9 @@ class MoleculeEnv(gym.Env):
     # todo: seed()
 
     def __init__(self):
-        possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
-        # possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
-        #                   'Br']  # ZINC
+        # possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
+        possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
+                          'Br']  # ZINC
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.mol = Chem.RWMol()
@@ -41,8 +41,8 @@ class MoleculeEnv(gym.Env):
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
-        self.max_atom = 13 + len(possible_atoms) # gdb 13
-        # self.max_atom = 38 + len(possible_atoms) # ZINC
+        # self.max_atom = 13 + len(possible_atoms) # gdb 13
+        self.max_atom = 38 + len(possible_atoms) # ZINC
         self.max_action = 200
         self.logp_ratio = 5
         self.qed_ratio = 1
@@ -145,9 +145,9 @@ class MoleculeEnv(gym.Env):
             # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
             reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
             smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-            print('counter', self.counter, 'new', new, 'reward', reward)
-            print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
-            print('smile',smile)
+            # print('counter', self.counter, 'new', new, 'reward', reward)
+            # print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
+            # print('smile',smile)
         else:
             new = False
             # print('counter', self.counter, 'new', new, 'reward_step', reward_step)
