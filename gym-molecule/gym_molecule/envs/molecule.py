@@ -405,6 +405,26 @@ class MoleculeEnv(gym.Env):
 
         return ob,ac
 
+# TODO(Bowen): check
+from rdkit.Chem.FilterCatalog import FilterCatalogParams, FilterCatalog
+class zinc_molecule_filter:
+    """
+    Flags molecules based on a provided set of zinc rules from
+    http://blaster.docking.org/filtering/rules_default.txt
+    """
+    def __init__(self):
+        params = FilterCatalogParams()
+        params.AddCatalog(FilterCatalogParams.FilterCatalogs.ZINC)
+        self.catalog = FilterCatalog(params)
+
+    def check_molecule_pass(self, mol):
+        """
+        Returns True if molecule is okay (ie does not match any of the
+        rules), False if otherwise
+        :param mol: rdkit mol object
+        :return:
+        """
+        return not self.catalog.HasMatch(mol)
 
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
