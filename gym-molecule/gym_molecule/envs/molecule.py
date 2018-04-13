@@ -29,9 +29,9 @@ class MoleculeEnv(gym.Env):
     # todo: seed()
 
     def __init__(self):
-        possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
-        # possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
-        #                   'Br']  # ZINC
+        # possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
+        possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
+                          'Br']  # ZINC
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.mol = Chem.RWMol()
@@ -41,7 +41,8 @@ class MoleculeEnv(gym.Env):
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
-        self.max_atom = 30 # allow for batch calculation, zero padding for smaller molecule
+        # self.max_atom = 13 + len(possible_atoms) # gdb 13
+        self.max_atom = 38 + len(possible_atoms) # ZINC
         self.max_action = 200
         self.logp_ratio = 5
         self.qed_ratio = 1
@@ -101,7 +102,7 @@ class MoleculeEnv(gym.Env):
             # check chemical validity of final molecule (valency, as well as
             # other rdkit molecule checks, such as aromaticity)
             if not self.check_chemical_validity():
-                reward_valid = -1 # arbitrary choice
+                reward_valid = -10 # arbitrary choice
                 reward_qed = 0
                 reward_logp = 0
                 reward_sa = 0
@@ -135,6 +136,9 @@ class MoleculeEnv(gym.Env):
                     # else:
                     #     reward_sa = 0
                 except:
+                    reward_qed = -1
+                    reward_logp = -1
+                    reward_sa = 10
                     print('error')
 
                 #TODO(Bowen): synthetic accessibility metric to optimize
@@ -144,9 +148,9 @@ class MoleculeEnv(gym.Env):
             # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
             reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
             smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-            print('counter', self.counter, 'new', new, 'reward', reward)
-            print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
-            print('smile',smile)
+            # print('counter', self.counter, 'new', new, 'reward', reward)
+            # print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
+            # print('smile',smile)
         else:
             new = False
             # print('counter', self.counter, 'new', new, 'reward_step', reward_step)
@@ -266,6 +270,20 @@ class MoleculeEnv(gym.Env):
             return True
         except ValueError:
             return False
+
+    def get_info(self):
+        info = {}
+        info['smile'] = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+        info['reward_qed'] = qed(self.mol) * self.qed_ratio
+        info['reward_logp'] = Chem.Crippen.MolLogP(self.mol) / self.mol.GetNumAtoms() * self.logp_ratio  # arbitrary choice
+        s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+        m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+        info['reward_sa'] = calculateScore(m) * self.sa_ratio  # lower better
+        info['reward_sum'] = info['reward_qed'] + info['reward_logp'] + info['reward_sa']
+        info['qed_ratio'] = self.qed_ratio
+        info['logp_ratio'] = self.logp_ratio
+        info['sa_ratio'] = self.sa_ratio
+        return info
 
     def get_matrices(self):
         """

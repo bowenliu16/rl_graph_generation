@@ -7,13 +7,13 @@ from baselines.common import set_global_seeds
 from baselines import logger
 # from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # from baselines.common.cmd_util import atari_arg_parser
-# from tensorboardX import SummaryWriter
-
+from tensorboardX import SummaryWriter
+import os
 
 import gym
 # import gym_molecule
 
-def train(env_id, num_timesteps, seed,writer=None):
+def train(args,env_id, num_timesteps, seed,writer=None):
     from baselines.ppo1 import pposgd_simple_gcn, gcn_policy
     import baselines.common.tf_util as U
     rank = MPI.COMM_WORLD.Get_rank()
@@ -37,7 +37,7 @@ def train(env_id, num_timesteps, seed,writer=None):
     # env = wrap_deepmind(env)
     # env.seed(workerseed)
 
-    pposgd_simple_gcn.learn(env, policy_fn,
+    pposgd_simple_gcn.learn(args,env, policy_fn,
         max_timesteps=int(num_timesteps * 1.1),
         timesteps_per_actorbatch=64,
         clip_param=0.2, entcoeff=0.01,
@@ -63,17 +63,30 @@ def atari_arg_parser():
     parser.add_argument('--env', help='environment ID',
                         default='BreakoutNoFrameskip-v4')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--num-timesteps', type=int, default=int(10e6))
+    parser.add_argument('--num-timesteps', type=int, default=int(10e7))
+    parser.add_argument('--name', type=str, default='test')
     return parser
 
 def main():
     args = atari_arg_parser().parse_args()
-    # writer = SummaryWriter()
+    # check and clean
+    if not os.path.exists('molecule_gen'):
+        os.makedirs('molecule_gen')
+    # new
+    with open('molecule_gen/' + args.name + '.csv', 'a') as f:
+        f.write('{},{},{},{},{},{},{},{}\n'.format('smile', 'reward_qed', 'reward_logp','reward_sa', 'reward_sum', 'qed_ratio',
+                                                   'logp_ratio', 'sa_ratio'))
+
+    # only keep first worker result in tensorboard
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        writer = SummaryWriter(comment='_'+args.name)
+    else:
+        writer = None
     try:
-        train(args.env, num_timesteps=args.num_timesteps, seed=args.seed,writer=None)
+        train(args,args.env, num_timesteps=args.num_timesteps, seed=args.seed,writer=writer)
     except:
-        # writer.export_scalars_to_json("./all_scalars.json")
-        # writer.close()
+        writer.export_scalars_to_json("./all_scalars.json")
+        writer.close()
         pass
 
 if __name__ == '__main__':
