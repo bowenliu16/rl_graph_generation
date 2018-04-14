@@ -29,9 +29,14 @@ class MoleculeEnv(gym.Env):
     # todo: seed()
 
     def __init__(self):
-        # possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
-        possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
-                          'Br']  # ZINC
+        ## todo: don't know how to pass argument to gym env yet..
+        # data_type = 'gdb'
+        data_type = 'zinc'
+        if data_type=='gdb':
+            possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
+        elif data_type=='zinc':
+            possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
+                              'Br']  # ZINC
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.mol = Chem.RWMol()
@@ -41,8 +46,10 @@ class MoleculeEnv(gym.Env):
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
-        # self.max_atom = 13 + len(possible_atoms) # gdb 13
-        self.max_atom = 38 + len(possible_atoms) # ZINC
+        if data_type=='gdb':
+            self.max_atom = 13 + len(possible_atoms) # gdb 13
+        elif data_type=='zinc':
+            self.max_atom = 38 + len(possible_atoms) # ZINC
         self.max_action = 200
         self.logp_ratio = 1
         self.qed_ratio = 1
@@ -56,10 +63,12 @@ class MoleculeEnv(gym.Env):
 
         ## load expert data
         cwd = os.path.dirname(__file__)
-        path = os.path.join(os.path.dirname(cwd), 'dataset',
-                            'gdb13.rand1M.smi.gz')  # gdb 13
-        # path = os.path.join(os.path.dirname(cwd), 'dataset',
-        #                     '250k_rndm_zinc_drugs_clean.smi')  # ZINC
+        if data_type=='gdb':
+            path = os.path.join(os.path.dirname(cwd), 'dataset',
+                                'gdb13.rand1M.smi.gz')  # gdb 13
+        elif data_type=='zinc':
+            path = os.path.join(os.path.dirname(cwd), 'dataset',
+                                '250k_rndm_zinc_drugs_clean.smi')  # ZINC
         self.dataset = gdb_dataset(path)
 
 
@@ -440,6 +449,13 @@ if __name__ == '__main__':
     ob,ac = env.get_expert(4)
     print(ob)
     print(ac)
+
+    atom_list = []
+    bond_list = []
+    for i in range(100):
+        atom_list.append(env.dataset[i].GetNumAtoms())
+        bond_list.append(env.dataset[i].GetNumBonds())
+    print(max(atom_list),max(bond_list))
 
     # env.step(np.array([[0,3,0]]))
     # env.step(np.array([[1,4,0]]))
