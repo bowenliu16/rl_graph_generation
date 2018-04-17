@@ -4,6 +4,7 @@ import gym
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem.Descriptors import qed
+from rdkit.Chem import rdMolDescriptors
 # import gym_molecule
 import copy
 import networkx as nx
@@ -23,6 +24,25 @@ def nostdout():
             yield
         finally:
             sys.stdout = old_stdout
+
+# TODO(Bowen): check
+def convert_radical_electrons_to_hydrogens(mol):
+    """
+    Converts radical electrons in a molecule into bonds to hydrogens. Only
+    use this if molecule is valid. Results a new mol object
+    :param mol: rdkit mol object
+    :return: rdkit mol object
+    """
+    m = copy.deepcopy(mol)
+    if Chem.Descriptors.NumRadicalElectrons(m) == 0:  # not a radical
+        return
+    else:  # a radical
+        for a in m.GetAtoms():
+            num_radical_e = a.GetNumRadicalElectrons()
+            if num_radical_e > 0:
+                a.SetNumRadicalElectrons(0)
+                a.SetNumExplicitHs(num_radical_e)
+    return m
 
 class MoleculeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -243,11 +263,10 @@ class MoleculeEnv(gym.Env):
     def get_num_bonds(self):
         return self.total_bonds
 
-    # TODO(Bowen): check
     def check_chemical_validity(self):
         """
         Checks the chemical validity of the mol object. Existing mol object is
-        not modified
+        not modified. Radicals pass this test.
         :return: True if chemically valid, False otherwise
         """
         s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
@@ -257,7 +276,6 @@ class MoleculeEnv(gym.Env):
         else:
             return False
 
-    # TODO(Bowen): check
     def check_valency(self):
         """
         Checks that no atoms in the mol have exceeded their possible
@@ -270,6 +288,26 @@ class MoleculeEnv(gym.Env):
             return True
         except ValueError:
             return False
+
+    # TODO(Bowen): check
+    def get_final_smiles(self):
+        """
+        Returns a SMILES of the final molecule. Converts any radical
+        electrons into hydrogens. Works only if molecule is valid
+        :return: SMILES
+        """
+        m = convert_radical_electrons_to_hydrogens(self.mol)
+        return Chem.MolToSmiles(m, isomericSmiles=True)
+
+    # TODO(Bowen): check
+    def get_final_mol(self):
+        """
+        Returns a rdkit mol object of the final molecule. Converts any radical
+        electrons into hydrogens. Works only if molecule is valid
+        :return: SMILES
+        """
+        m = convert_radical_electrons_to_hydrogens(self.mol)
+        return m
 
     def get_info(self):
         info = {}
@@ -423,17 +461,22 @@ class MoleculeEnv(gym.Env):
 
         return ob,ac
 
-# TODO(Bowen): check
+### YES/NO filters ###
+
 from rdkit.Chem.FilterCatalog import FilterCatalogParams, FilterCatalog
 class zinc_molecule_filter:
     """
-    Flags molecules based on a provided set of zinc rules from
+    Flags molecules based on problematic functional groups as
+    provided set of ZINC rules from
     http://blaster.docking.org/filtering/rules_default.txt
     """
     def __init__(self):
         params = FilterCatalogParams()
         params.AddCatalog(FilterCatalogParams.FilterCatalogs.ZINC)
         self.catalog = FilterCatalog(params)
+
+    def __call__(self, mol):
+        return self.check_molecule_pass(mol)
 
     def check_molecule_pass(self, mol):
         """
@@ -443,6 +486,126 @@ class zinc_molecule_filter:
         :return:
         """
         return not self.catalog.HasMatch(mol)
+
+# TODO(Bowen): check
+from rdkit.Chem import AllChem
+def steric_strain_filter(mol, forcefield='uff', cutoff=320,
+                         max_attempts_embed=20,
+                         max_num_iters=200):
+    """
+    Flags molecules based on a steric energy cutoff after max_num_iters
+    iterations of UFF forcefield minimization
+    :param mol: rdkit mol object
+    :param forcefield: forcefield type. either uff or mmff94
+    :param cutoff: kcal/mol units. If minimized energy is above this
+    threshold, then molecule fails the steric strain filter
+    :param max_attempts_embed: number of attempts to generate initial 3d
+    coordinates
+    :param max_num_iters: number of iterations of forcefield minimization
+    :return: True if molecule could be successfully minimized, and resulting
+    energy is below cutoff, otherwise False
+    """
+    # make copy of input mol and add hydrogens
+    m = copy.deepcopy(mol)
+    Chem.SanitizeMol(m) # TODO(Bowen): check if this is even necessary?
+    m_h = Chem.AddHs(m)
+
+    # generate an initial 3d conformer
+    flag = AllChem.EmbedMolecule(m_h, maxAttempts=max_attempts_embed)
+    if flag == -1:
+        print("Unable to generate 3d conformer")
+        return False
+
+    # set up the forcefield
+    if forcefield == 'mmff94':
+        AllChem.MMFFSanitizeMolecule(m_h)
+        if AllChem.MMFFHasAllMoleculeParams(m_h):
+            mmff_props = AllChem.MMFFGetMoleculeProperties(m_h)
+            ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
+        else:
+            print("Unrecognized atom type")
+            return False
+    elif forcefield == 'uff':
+        if AllChem.UFFHasAllMoleculeParams(m_h):
+            ff = AllChem.UFFGetMoleculeForceField(m_h)
+        else:
+            print("Unrecognized atom type")
+            return False
+    else:
+        return ValueError("Invalid forcefield type")
+
+    # calculate steric energy
+    try:
+        ff.Minimize(maxIts=max_num_iters)
+    except:
+        print("Minimization error")
+        return False
+
+    min_e = ff.CalcEnergy()
+    print("Minimized energy: {}".format(min_e))
+
+    if min_e < cutoff:
+        return True
+    else:
+        return False
+
+### TARGET VALUE REWARDS ###
+
+def reward_target_log_p(mol, target):
+    """
+    Reward for a target log p
+    :param mol: rdkit mol object
+    :param target: float
+    :return: float (-inf, 1]
+    """
+    x = Chem.Crippen.MolLogP(mol)
+    reward = -1 * (x - target)**2 + 1
+    return reward
+
+def reward_target_mw(mol, target):
+    """
+    Reward for a target molecular weight
+    :param mol: rdkit mol object
+    :param target: float
+    :return: float (-inf, 1]
+    """
+    x = rdMolDescriptors.CalcExactMolWt(mol)
+    reward = -1 * (x - target)**2 + 1
+    return reward
+
+# TODO(Bowen): num rings is a discrete variable, so what is the best way to
+# calculate the reward?
+def reward_target_num_rings(mol, target):
+    """
+    Reward for a target number of rings
+    :param mol: rdkit mol object
+    :param target: int
+    :return: float (-inf, 1]
+    """
+    x = rdMolDescriptors.CalcNumRings(mol)
+    reward = -1 * (x - target)**2 + 1
+    return reward
+
+# TODO(Bowen): more efficient if we precalculate the target fingerprint
+from rdkit import DataStructs
+def reward_target_molecule_similarity(mol, target, radius=2, nBits=2048,
+                                      useChirality=True):
+    """
+    Reward for a target molecule similarity, based on tanimoto similarity
+    between the ECFP fingerprints of the x molecule and target molecule
+    :param mol: rdkit mol object
+    :param target: rdkit mol object
+    :return: float, [0.0, 1.0]
+    """
+    x = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=radius,
+                                                        nBits=nBits,
+                                                        useChirality=useChirality)
+    target = rdMolDescriptors.GetMorganFingerprintAsBitVect(target,
+                                                            radius=radius,
+                                                        nBits=nBits,
+                                                        useChirality=useChirality)
+    return DataStructs.TanimotoSimilarity(x, target)
+
 
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
