@@ -30,8 +30,8 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         ## todo: don't know how to pass argument to gym env yet..
-        # data_type = 'gdb'
-        data_type = 'zinc'
+        data_type = 'gdb'
+        # data_type = 'zinc'
         if data_type=='gdb':
             possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
         elif data_type=='zinc':
