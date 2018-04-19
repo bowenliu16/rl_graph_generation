@@ -50,8 +50,7 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         # possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
-        possible_atoms = ['B', 'C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
-                          'Br']  # ZINC
+        possible_atoms = ['C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl', 'Br']  # ZINC
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.mol = Chem.RWMol()
