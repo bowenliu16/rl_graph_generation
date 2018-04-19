@@ -489,15 +489,16 @@ class zinc_molecule_filter:
 
 # TODO(Bowen): check
 from rdkit.Chem import AllChem
-def steric_strain_filter(mol, forcefield='uff', cutoff=320,
+import itertools
+def steric_strain_filter(mol, cutoff=0.82,
                          max_attempts_embed=20,
                          max_num_iters=200):
     """
     Flags molecules based on a steric energy cutoff after max_num_iters
-    iterations of UFF forcefield minimization
+    iterations of MMFF94 forcefield minimization. Cutoff is based on average
+    angle bend strain energy of molecule
     :param mol: rdkit mol object
-    :param forcefield: forcefield type. either uff or mmff94
-    :param cutoff: kcal/mol units. If minimized energy is above this
+    :param cutoff: kcal/mol per angle . If minimized energy is above this
     threshold, then molecule fails the steric strain filter
     :param max_attempts_embed: number of attempts to generate initial 3d
     coordinates
@@ -507,7 +508,6 @@ def steric_strain_filter(mol, forcefield='uff', cutoff=320,
     """
     # make copy of input mol and add hydrogens
     m = copy.deepcopy(mol)
-    Chem.SanitizeMol(m) # TODO(Bowen): check if this is even necessary?
     m_h = Chem.AddHs(m)
 
     # generate an initial 3d conformer
@@ -517,37 +517,179 @@ def steric_strain_filter(mol, forcefield='uff', cutoff=320,
         return False
 
     # set up the forcefield
-    if forcefield == 'mmff94':
-        AllChem.MMFFSanitizeMolecule(m_h)
-        if AllChem.MMFFHasAllMoleculeParams(m_h):
-            mmff_props = AllChem.MMFFGetMoleculeProperties(m_h)
-            ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
-        else:
-            print("Unrecognized atom type")
-            return False
-    elif forcefield == 'uff':
-        if AllChem.UFFHasAllMoleculeParams(m_h):
-            ff = AllChem.UFFGetMoleculeForceField(m_h)
-        else:
-            print("Unrecognized atom type")
-            return False
+    AllChem.MMFFSanitizeMolecule(m_h)
+    if AllChem.MMFFHasAllMoleculeParams(m_h):
+        mmff_props = AllChem.MMFFGetMoleculeProperties(m_h)
+        ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
     else:
-        return ValueError("Invalid forcefield type")
+        print("Unrecognized atom type")
+        return False
 
-    # calculate steric energy
+    # minimize steric energy
     try:
         ff.Minimize(maxIts=max_num_iters)
     except:
         print("Minimization error")
         return False
 
-    min_e = ff.CalcEnergy()
-    print("Minimized energy: {}".format(min_e))
+    # ### debug ###
+    # min_e = ff.CalcEnergy()
+    # print("Minimized energy: {}".format(min_e))
+    # ### debug ###
 
-    if min_e < cutoff:
+    # get the angle bend term contribution to the total molecule strain energy
+    mmff_props.SetMMFFBondTerm(False)
+    mmff_props.SetMMFFAngleTerm(True)
+    mmff_props.SetMMFFStretchBendTerm(False)
+    mmff_props.SetMMFFOopTerm(False)
+    mmff_props.SetMMFFTorsionTerm(False)
+    mmff_props.SetMMFFVdWTerm(False)
+    mmff_props.SetMMFFEleTerm(False)
+
+    ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
+
+    min_angle_e = ff.CalcEnergy()
+    # print("Minimized angle bend energy: {}".format(min_angle_e))
+
+    # find number of angles in molecule
+    # TODO(Bowen): there must be a better way to get a list of all angles
+    # from molecule... This is too hacky
+    num_atoms = m_h.GetNumAtoms()
+    atom_indices = range(num_atoms)
+    angle_atom_triplets = itertools.permutations(atom_indices, 3)  # get all
+    # possible 3 atom indices groups. Currently, each angle is represented by
+    #  2 duplicate groups. Should remove duplicates here to be more efficient
+    double_num_angles = 0
+    for triplet in list(angle_atom_triplets):
+        if mmff_props.GetMMFFAngleBendParams(m_h, *triplet):
+            double_num_angles += 1
+    num_angles = double_num_angles / 2  # account for duplicate angles
+
+    # print("Number of angles: {}".format(num_angles))
+
+    avr_angle_e = min_angle_e / num_angles
+
+    # print("Average minimized angle bend energy: {}".format(avr_angle_e))
+
+    # ### debug ###
+    # for i in range(7):
+    #     termList = [['BondStretch', False], ['AngleBend', False],
+    #                 ['StretchBend', False], ['OopBend', False],
+    #                 ['Torsion', False],
+    #                 ['VdW', False], ['Electrostatic', False]]
+    #     termList[i][1] = True
+    #     mmff_props.SetMMFFBondTerm(termList[0][1])
+    #     mmff_props.SetMMFFAngleTerm(termList[1][1])
+    #     mmff_props.SetMMFFStretchBendTerm(termList[2][1])
+    #     mmff_props.SetMMFFOopTerm(termList[3][1])
+    #     mmff_props.SetMMFFTorsionTerm(termList[4][1])
+    #     mmff_props.SetMMFFVdWTerm(termList[5][1])
+    #     mmff_props.SetMMFFEleTerm(termList[6][1])
+    #     ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
+    #     print('{0:>16s} energy: {1:12.4f} kcal/mol'.format(termList[i][0],
+    #                                                  ff.CalcEnergy()))
+    # ## end debug ###
+
+    if avr_angle_e < cutoff:
         return True
     else:
         return False
+
+# # old one, don't use this for now
+# def steric_strain_filter(mol, forcefield='uff', cutoff=320,
+#                          max_attempts_embed=20,
+#                          max_num_iters=200):
+#     """
+#     Flags molecules based on a steric energy cutoff after max_num_iters
+#     iterations of forcefield minimization. Cutoff is based on steric energy
+#     per heavy atom
+#     :param mol: rdkit mol object
+#     :param forcefield: forcefield type. either uff or mmff94
+#     :param cutoff: kcal/mol per heavy atom . If minimized energy is above this
+#     threshold, then molecule fails the steric strain filter
+#     :param max_attempts_embed: number of attempts to generate initial 3d
+#     coordinates
+#     :param max_num_iters: number of iterations of forcefield minimization
+#     :return: True if molecule could be successfully minimized, and resulting
+#     energy is below cutoff, otherwise False
+#     """
+#     # make copy of input mol and add hydrogens
+#     m = copy.deepcopy(mol)
+#     Chem.SanitizeMol(m) # TODO(Bowen): check if this is even necessary?
+#     m_h = Chem.AddHs(m)
+#
+#     # generate an initial 3d conformer
+#     flag = AllChem.EmbedMolecule(m_h, maxAttempts=max_attempts_embed)
+#     if flag == -1:
+#         print("Unable to generate 3d conformer")
+#         return False
+#
+#     # set up the forcefield
+#     if forcefield == 'mmff94':
+#         AllChem.MMFFSanitizeMolecule(m_h)
+#         if AllChem.MMFFHasAllMoleculeParams(m_h):
+#             mmff_props = AllChem.MMFFGetMoleculeProperties(m_h)
+#             ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
+#         else:
+#             print("Unrecognized atom type")
+#             return False
+#     elif forcefield == 'uff':
+#         if AllChem.UFFHasAllMoleculeParams(m_h):
+#             ff = AllChem.UFFGetMoleculeForceField(m_h)
+#         else:
+#             print("Unrecognized atom type")
+#             return False
+#     else:
+#         return ValueError("Invalid forcefield type")
+#
+#     # minimize steric energy
+#     try:
+#         ff.Minimize(maxIts=max_num_iters)
+#     except:
+#         print("Minimization error")
+#         return False
+#
+#     min_e = ff.CalcEnergy()
+#     print("Minimized energy: {}".format(min_e))
+#     print("Minimized energy per heavy atom: {}".format(min_e / m.GetNumAtoms()))
+#
+#     if min_e < cutoff:
+#         return True
+#     else:
+#         return False
+
+# TEST steric_strain_filter
+# known 'stable' molecules
+s_smiles = ['CCC/C=C/C=C/C(=O)O[C@H]1/C(=C/C(=O)OC)/C[C@H]2C[C@@H](OC(=O)['
+            'C@@H](CC[C@@H]3C[C@@H](C([C@@](O3)(C[C@@H]4C/C(=C/C(=O)OC)/C[C@@H](O4)/C=C/C([C@@]1(O2)O)(C)C)O)(C)C)OC(=O)C)O)[C@@H](C)O',
+            'O=S1(C2=CC=CC=C2NC3=C1C(C4=CC=CC=C4)=NO3)=O',
+            'Cl/C(C1=CC=CC=C1)=N/O',
+            'FC1=CC=CC=C1S(CC#N)=O',
+            'COC([C@@H]([C@H](c(c[nH]1)c2c1cccc2)C)NC(C3CCN(CC3)C('
+            'c4ccccc4)=O)=O)=O',
+            'Cc1c(C(O)=O)sc(N2CCN(C2=O)Cc3ccc(OC(F)(F)F)cc3)n1',
+            'C[C@H](c1cc(C(F)(F)F)cc(C(F)(F)F)c1)O[C@H]2CCN(C['
+            'C@H]2c3ccccc3)C([C@H]4CC[C@@H](CC4)C(O)=O)=O',
+            'O=C1CCC(N1Br)=O',
+            'C1CC2CCC1C2',
+            'C1#CCCCCCC1',
+            'C1CCCCC/C=C/1',
+            'C1(C2)CCC2C=C1',
+            'C1CC2CCC=C(C1)C2',
+            'C12C3C4C1C5C2C3C45']
+for s in s_smiles:
+    m = Chem.MolFromSmiles(s)
+    assert steric_strain_filter(m) == True
+# known 'unstable' molecules
+u_smiles = ['C1#CC1',
+            'C1#CCC1',
+            'C1#CCCC1',
+            'C1#CCCCCC1',
+            'C1(C2)=CCC2CC1',
+            'C1(CC2)=CC2CC1']
+for u in u_smiles:
+    m = Chem.MolFromSmiles(u)
+    assert steric_strain_filter(m) == False
 
 ### TARGET VALUE REWARDS ###
 
