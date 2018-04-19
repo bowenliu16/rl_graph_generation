@@ -1,10 +1,13 @@
 import gym
+import itertools
 # from gym import error, spaces, utils
 # from gym.utils import seeding
 import numpy as np
-from rdkit import Chem
+from rdkit import Chem  # TODO(Bowen): remove and just use AllChem
+from rdkit.Chem import AllChem
 from rdkit.Chem.Descriptors import qed
 from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem.FilterCatalog import FilterCatalogParams, FilterCatalog
 # import gym_molecule
 import copy
 import networkx as nx
@@ -25,7 +28,7 @@ def nostdout():
         finally:
             sys.stdout = old_stdout
 
-# TODO(Bowen): check
+# TODO(Bowen): check, esp if input is not radical
 def convert_radical_electrons_to_hydrogens(mol):
     """
     Converts radical electrons in a molecule into bonds to hydrogens. Only
@@ -35,7 +38,7 @@ def convert_radical_electrons_to_hydrogens(mol):
     """
     m = copy.deepcopy(mol)
     if Chem.Descriptors.NumRadicalElectrons(m) == 0:  # not a radical
-        return
+        return m
     else:  # a radical
         for a in m.GetAtoms():
             num_radical_e = a.GetNumRadicalElectrons()
@@ -92,7 +95,8 @@ class MoleculeEnv(gym.Env):
         self.dataset = gdb_dataset(path)
 
 
-
+    #TODO(Bowen): The top try, except clause allows error messages from step
+    # to be printed when running run_molecules.py. For debugging only
     def step(self, action):
         """
             Perform a given action
@@ -101,101 +105,151 @@ class MoleculeEnv(gym.Env):
             :return: reward of 1 if resulting molecule graph does not exceed valency,
             -1 if otherwise
             """
-        self.mol_old = copy.deepcopy(self.mol)
-        # print('num atoms',self.mol.GetNumAtoms())
-        total_atoms = self.mol.GetNumAtoms()
-        # take action
+        try:
 
-        if action[0, 1] >= total_atoms:
-            self._add_atom(action[0, 1] - total_atoms)  # add new node
-            action[0, 1] = total_atoms  # new node id
-            self._add_bond(action)  # add new edge
-        else:
-            self._add_bond(action)  # add new edge
+            self.mol_old = copy.deepcopy(self.mol)
+            # print('num atoms',self.mol.GetNumAtoms())
+            total_atoms = self.mol.GetNumAtoms()
+            # take action
 
-        reward = 0
-        # calculate intermediate rewards
-        if self.check_valency():
-            if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
-                reward_step = 1/self.max_atom
+            if action[0, 1] >= total_atoms:
+                self._add_atom(action[0, 1] - total_atoms)  # add new node
+                action[0, 1] = total_atoms  # new node id
+                self._add_bond(action)  # add new edge
             else:
-                reward_step = -1/self.max_atom
-        else:
-            reward_step = -1/self.max_atom  # arbitrary choice
-            self.mol = self.mol_old
+                self._add_bond(action)  # add new edge
 
-        # calculate terminal rewards
-        if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action:
-            #  some arbitrary termination condition for episode
+            # calculate intermediate rewards
+            if self.check_valency():
+                if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
+                    reward_step = 1/self.max_atom
+                else:
+                    reward_step = -1/self.max_atom
+            else:
+                reward_step = -1/self.max_atom  # arbitrary choice
+                self.mol = self.mol_old
 
-            # check chemical validity of final molecule (valency, as well as
-            # other rdkit molecule checks, such as aromaticity)
-            if not self.check_chemical_validity():
-                reward_valid = -10 # arbitrary choice
+            # calculate terminal rewards
+            if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action:
+                #  some arbitrary termination condition for episode
+                print('start terminal rewards')
+
+                # default reward for invalid molecule. Will be overwritten
+                # with proper values if molecule is valid
+                reward_valid = -10  # arbitrary choice
                 reward_qed = 0
-                reward_logp = 0
                 reward_sa = 0
-                # reward_cycle = 0
-            else:   # these metrics only work for valid molecules
-                # drug likeness metric to optimize. qed can have values [0, 1]
-                reward_valid = 1
-                try:
-                    # reward_qed = 5**qed(self.mol)    # arbitrary choice of exponent
-                    reward_qed = qed(self.mol)
-                # log p. Assume we want to increase log p. log p typically
-                # have values between -3 and 7
-                    reward_logp = Chem.Crippen.MolLogP(self.mol)/self.mol.GetNumAtoms()    # arbitrary choice
-                    s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-                    m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
-                    reward_sa = calculateScore(m) # lower better
 
-                    # cycle_list = nx.cycle_basis(nx.Graph(Chem.GetAdjacencyMatrix(self.mol)))
-                    # if len(cycle_list) == 0:
-                    #     cycle_length = 0
-                    # else:
-                    #     cycle_length = max([len(j) for j in cycle_list])
-                    # if cycle_length <= 6:
-                    #     cycle_length = 0
-                    # else:
-                    #     cycle_length = cycle_length - 6
-                    # reward_cycle = cycle_length
-
-                    # if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]:
-                    #     reward_sa = calculateScore(self.mol)
-                    # else:
-                    #     reward_sa = 0
-                except:
-                    reward_qed = -1
-                    reward_logp = -1
-                    reward_sa = 10
-                    print('reward error')
-
-                #TODO(Bowen): synthetic accessibility metric to optimize
-            new = True # end of episode
-            # reward = reward_step + reward_valid + reward_logp +reward_qed*self.qed_ratio
-            # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
-            # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
-            reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
-            # smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-            # print('counter', self.counter, 'new', new, 'reward', reward)
-            # print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
-            # print('smile',smile)
-        else:
-            new = False
-            # print('counter', self.counter, 'new', new, 'reward_step', reward_step)
-            reward = reward_step
+                # rewards for valid molecule
+                if self.check_chemical_validity():  # chemically valid
+                    # final mol object where any radical electrons are changed to
+                    # bonds to hydrogen
+                    print('check chemical validity passed!')
+                    final_mol = self.get_final_mol()
+                    # sanitize
+                    s = Chem.MolToSmiles(final_mol, isomericSmiles=True)
+                    print(s)
+                    final_mol = Chem.MolFromSmiles(s)
+                    if steric_strain_filter(final_mol):  # passes 3D conversion
+                        # test and no excessive strain
+                        print('check steric strain passed!')
+                        if zinc_molecule_filter(final_mol):  # does not contain any
+                            # problematic functional groups
+                            print('check zinc filter passed!')
+                            reward_valid = 1    # arbitrary choice
 
 
-        # get observation
-        ob = self.get_observation()
+                            # Property rewards. Should only come into effect if
+                            # the we have determined the molecule is valid
+                            try:
+                                print('start property rewards')
+                                # 1. QED reward. Can have values [0, 1]. Higher the
+                                # better
+                                reward_qed = qed(final_mol)
 
-        info = {} # info we care about
+                                print('qed reward complete!')
+                                # 2. Synthetic accessibility reward. Values naively
+                                # normalized to [0, 1]. Higher the better
+                                sa = -1 * calculateScore(final_mol)
+                                reward_sa = (sa + 10) / (10 - 1)
 
-        self.counter += 1
-        if new:
-            self.counter = 0
+                                print('sa reward complete!')
+                            except: # if any property reward error, reset all
+                                # property rewards
+                                reward_qed = 0
+                                reward_sa = 0
+                                print('reward error')
 
-        return ob,reward,new,info
+                # # check chemical validity of final molecule (valency, as well as
+                # # other rdkit molecule checks, such as aromaticity)
+                # if not self.check_chemical_validity():
+                #     reward_valid = -10 # arbitrary choice
+                #     reward_qed = 0
+                #     reward_logp = 0
+                #     reward_sa = 0
+                #     # reward_cycle = 0
+                # else:   # these metrics only work for valid molecules
+                #     # drug likeness metric to optimize. qed can have values [0, 1]
+                #     reward_valid = 1
+                #     try:
+                #         # reward_qed = 5**qed(self.mol)    # arbitrary choice of exponent
+                #         reward_qed = qed(self.mol)
+                #     # log p. Assume we want to increase log p. log p typically
+                #     # have values between -3 and 7
+                #         reward_logp = Chem.Crippen.MolLogP(self.mol)/self.mol.GetNumAtoms()    # arbitrary choice
+                #         s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+                #         m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+                #         reward_sa = calculateScore(m) # lower better
+                #
+                #         # cycle_list = nx.cycle_basis(nx.Graph(Chem.GetAdjacencyMatrix(self.mol)))
+                #         # if len(cycle_list) == 0:
+                #         #     cycle_length = 0
+                #         # else:
+                #         #     cycle_length = max([len(j) for j in cycle_list])
+                #         # if cycle_length <= 6:
+                #         #     cycle_length = 0
+                #         # else:
+                #         #     cycle_length = cycle_length - 6
+                #         # reward_cycle = cycle_length
+                #
+                #         # if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]:
+                #         #     reward_sa = calculateScore(self.mol)
+                #         # else:
+                #         #     reward_sa = 0
+                #     except:
+                #         reward_qed = -1
+                #         reward_logp = -1
+                #         reward_sa = 10
+                #         print('reward error')
+
+                new = True # end of episode
+                # reward = reward_step + reward_valid + reward_logp +reward_qed*self.qed_ratio
+                # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
+                # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
+                # reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
+                reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_sa*self.sa_ratio
+                # smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+                # print('counter', self.counter, 'new', new, 'reward', reward)
+                # print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
+                # print('smile',smile)
+            else:
+                new = False
+                # print('counter', self.counter, 'new', new, 'reward_step', reward_step)
+                reward = reward_step
+
+
+            # get observation
+            ob = self.get_observation()
+
+            info = {} # info we care about
+
+            self.counter += 1
+            if new:
+                self.counter = 0
+
+            return ob,reward,new,info
+
+        except Exception as e: print(e)
 
 
     def reset(self):
@@ -298,7 +352,7 @@ class MoleculeEnv(gym.Env):
         except ValueError:
             return False
 
-    # TODO(Bowen): check
+    # TODO(Bowen): check if need to sanitize again
     def get_final_smiles(self):
         """
         Returns a SMILES of the final molecule. Converts any radical
@@ -308,7 +362,7 @@ class MoleculeEnv(gym.Env):
         m = convert_radical_electrons_to_hydrogens(self.mol)
         return Chem.MolToSmiles(m, isomericSmiles=True)
 
-    # TODO(Bowen): check
+    # TODO(Bowen): check if need to sanitize again
     def get_final_mol(self):
         """
         Returns a rdkit mol object of the final molecule. Converts any radical
@@ -318,6 +372,9 @@ class MoleculeEnv(gym.Env):
         m = convert_radical_electrons_to_hydrogens(self.mol)
         return m
 
+    # TODO: modify this to coincide with the rewards in the step. Do we need
+    # to do the radical conversion here, or has the mol object already been
+    # modified in place?
     def get_info(self):
         info = {}
         info['smile'] = Chem.MolToSmiles(self.mol, isomericSmiles=True)
@@ -477,34 +534,46 @@ class MoleculeEnv(gym.Env):
         return ob,ac
 
 ### YES/NO filters ###
-
-from rdkit.Chem.FilterCatalog import FilterCatalogParams, FilterCatalog
-class zinc_molecule_filter:
+def zinc_molecule_filter(mol):
     """
     Flags molecules based on problematic functional groups as
     provided set of ZINC rules from
-    http://blaster.docking.org/filtering/rules_default.txt
+    http://blaster.docking.org/filtering/rules_default.txt.
+    :param mol: rdkit mol object
+    :return: Returns True if molecule is okay (ie does not match any of
+    therules), False if otherwise
     """
-    def __init__(self):
-        params = FilterCatalogParams()
-        params.AddCatalog(FilterCatalogParams.FilterCatalogs.ZINC)
-        self.catalog = FilterCatalog(params)
+    params = FilterCatalogParams()
+    params.AddCatalog(FilterCatalogParams.FilterCatalogs.ZINC)
+    catalog = FilterCatalog(params)
+    return not catalog.HasMatch(mol)
 
-    def __call__(self, mol):
-        return self.check_molecule_pass(mol)
-
-    def check_molecule_pass(self, mol):
-        """
-        Returns True if molecule is okay (ie does not match any of the
-        rules), False if otherwise
-        :param mol: rdkit mol object
-        :return:
-        """
-        return not self.catalog.HasMatch(mol)
+# # Probably more efficient to initialize filters once, as in this class
+# # definition
+# class zinc_molecule_filter:
+#     """
+#     Flags molecules based on problematic functional groups as
+#     provided set of ZINC rules from
+#     http://blaster.docking.org/filtering/rules_default.txt
+#     """
+#     def __init__(self):
+#         params = FilterCatalogParams()
+#         params.AddCatalog(FilterCatalogParams.FilterCatalogs.ZINC)
+#         self.catalog = FilterCatalog(params)
+#
+#     def __call__(self, mol):
+#         return self.check_molecule_pass(mol)
+#
+#     def check_molecule_pass(self, mol):
+#         """
+#         Returns True if molecule is okay (ie does not match any of the
+#         rules), False if otherwise
+#         :param mol: rdkit mol object
+#         :return:
+#         """
+#         return not self.catalog.HasMatch(mol)
 
 # TODO(Bowen): check
-from rdkit.Chem import AllChem
-import itertools
 def steric_strain_filter(mol, cutoff=0.82,
                          max_attempts_embed=20,
                          max_num_iters=200):
@@ -521,13 +590,22 @@ def steric_strain_filter(mol, cutoff=0.82,
     :return: True if molecule could be successfully minimized, and resulting
     energy is below cutoff, otherwise False
     """
+    # check for the trivial cases of a single atom or only 2 atoms, in which
+    # case there is no angle bend strain energy (as there are no angles!)
+    if mol.GetNumAtoms() <= 2:
+        return True
+
     # make copy of input mol and add hydrogens
     m = copy.deepcopy(mol)
     m_h = Chem.AddHs(m)
 
     # generate an initial 3d conformer
-    flag = AllChem.EmbedMolecule(m_h, maxAttempts=max_attempts_embed)
-    if flag == -1:
+    try:
+        flag = AllChem.EmbedMolecule(m_h, maxAttempts=max_attempts_embed)
+        if flag == -1:
+            print("Unable to generate 3d conformer")
+            return False
+    except: # to catch error caused by molecules such as C=[SH]1=C2OC21ON(N)OC(=O)NO
         print("Unable to generate 3d conformer")
         return False
 
@@ -535,7 +613,11 @@ def steric_strain_filter(mol, cutoff=0.82,
     AllChem.MMFFSanitizeMolecule(m_h)
     if AllChem.MMFFHasAllMoleculeParams(m_h):
         mmff_props = AllChem.MMFFGetMoleculeProperties(m_h)
-        ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
+        try:    # to deal with molecules such as CNN1NS23(=C4C5=C2C(=C53)N4Cl)S1
+            ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
+        except:
+            print("Unable to get forcefield or sanitization error")
+            return False
     else:
         print("Unrecognized atom type")
         return False
