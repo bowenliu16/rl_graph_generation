@@ -673,38 +673,38 @@ def steric_strain_filter(mol, cutoff=0.82,
 #     else:
 #         return False
 
-# TEST steric_strain_filter
-# known 'stable' molecules
-s_smiles = ['CCC/C=C/C=C/C(=O)O[C@H]1/C(=C/C(=O)OC)/C[C@H]2C[C@@H](OC(=O)['
-            'C@@H](CC[C@@H]3C[C@@H](C([C@@](O3)(C[C@@H]4C/C(=C/C(=O)OC)/C[C@@H](O4)/C=C/C([C@@]1(O2)O)(C)C)O)(C)C)OC(=O)C)O)[C@@H](C)O',
-            'O=S1(C2=CC=CC=C2NC3=C1C(C4=CC=CC=C4)=NO3)=O',
-            'Cl/C(C1=CC=CC=C1)=N/O',
-            'FC1=CC=CC=C1S(CC#N)=O',
-            'COC([C@@H]([C@H](c(c[nH]1)c2c1cccc2)C)NC(C3CCN(CC3)C('
-            'c4ccccc4)=O)=O)=O',
-            'Cc1c(C(O)=O)sc(N2CCN(C2=O)Cc3ccc(OC(F)(F)F)cc3)n1',
-            'C[C@H](c1cc(C(F)(F)F)cc(C(F)(F)F)c1)O[C@H]2CCN(C['
-            'C@H]2c3ccccc3)C([C@H]4CC[C@@H](CC4)C(O)=O)=O',
-            'O=C1CCC(N1Br)=O',
-            'C1CC2CCC1C2',
-            'C1#CCCCCCC1',
-            'C1CCCCC/C=C/1',
-            'C1(C2)CCC2C=C1',
-            'C1CC2CCC=C(C1)C2',
-            'C12C3C4C1C5C2C3C45']
-for s in s_smiles:
-    m = Chem.MolFromSmiles(s)
-    assert steric_strain_filter(m) == True
-# known 'unstable' molecules
-u_smiles = ['C1#CC1',
-            'C1#CCC1',
-            'C1#CCCC1',
-            'C1#CCCCCC1',
-            'C1(C2)=CCC2CC1',
-            'C1(CC2)=CC2CC1']
-for u in u_smiles:
-    m = Chem.MolFromSmiles(u)
-    assert steric_strain_filter(m) == False
+# # TEST steric_strain_filter
+# # known 'stable' molecules
+# s_smiles = ['CCC/C=C/C=C/C(=O)O[C@H]1/C(=C/C(=O)OC)/C[C@H]2C[C@@H](OC(=O)['
+#             'C@@H](CC[C@@H]3C[C@@H](C([C@@](O3)(C[C@@H]4C/C(=C/C(=O)OC)/C[C@@H](O4)/C=C/C([C@@]1(O2)O)(C)C)O)(C)C)OC(=O)C)O)[C@@H](C)O',
+#             'O=S1(C2=CC=CC=C2NC3=C1C(C4=CC=CC=C4)=NO3)=O',
+#             'Cl/C(C1=CC=CC=C1)=N/O',
+#             'FC1=CC=CC=C1S(CC#N)=O',
+#             'COC([C@@H]([C@H](c(c[nH]1)c2c1cccc2)C)NC(C3CCN(CC3)C('
+#             'c4ccccc4)=O)=O)=O',
+#             'Cc1c(C(O)=O)sc(N2CCN(C2=O)Cc3ccc(OC(F)(F)F)cc3)n1',
+#             'C[C@H](c1cc(C(F)(F)F)cc(C(F)(F)F)c1)O[C@H]2CCN(C['
+#             'C@H]2c3ccccc3)C([C@H]4CC[C@@H](CC4)C(O)=O)=O',
+#             'O=C1CCC(N1Br)=O',
+#             'C1CC2CCC1C2',
+#             'C1#CCCCCCC1',
+#             'C1CCCCC/C=C/1',
+#             'C1(C2)CCC2C=C1',
+#             'C1CC2CCC=C(C1)C2',
+#             'C12C3C4C1C5C2C3C45']
+# for s in s_smiles:
+#     m = Chem.MolFromSmiles(s)
+#     assert steric_strain_filter(m) == True
+# # known 'unstable' molecules
+# u_smiles = ['C1#CC1',
+#             'C1#CCC1',
+#             'C1#CCCC1',
+#             'C1#CCCCCC1',
+#             'C1(C2)=CCC2CC1',
+#             'C1(CC2)=CC2CC1']
+# for u in u_smiles:
+#     m = Chem.MolFromSmiles(u)
+#     assert steric_strain_filter(m) == False
 
 ### TARGET VALUE REWARDS ###
 
