@@ -73,6 +73,11 @@ def bilinear_multi(emb_1, emb_2, out_dim, name='bilinear'):
         emb_2 = tf.tile(tf.expand_dims(emb_2,axis=1),[1,out_dim,1,1])
         return emb_1 @ tf.tile(W,[batch_size,1,1,1]) @ emb_2
 
+def emb_node(ob_node,out_channels):
+    batch_size = tf.shape(ob_node)[0]
+    in_channels = ob_node.get_shape()[-1]
+    emb = tf.get_variable('emb',[1,1,in_channels,out_channels])
+    return ob_node @ tf.tile(emb,[batch_size,1,1,1])
 
 
 class GCNPolicy(object):
@@ -90,7 +95,9 @@ class GCNPolicy(object):
         # only when evaluating given action, at training time
         self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,3]) # feed groudtruth action
         if kind == 'small':
-            self.emb_node1 = GCN_batch(ob['adj'], ob['node'], 32, name='gcn1')
+            # todo: add a embedding layer for ob_node
+            ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb')
+            self.emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1')
             self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, 32, is_act=False, is_normalize=True, name='gcn2')
             emb_node = tf.squeeze(self.emb_node2,axis=1)  # B*n*f
         else:
@@ -99,7 +106,7 @@ class GCNPolicy(object):
         ### 1 only keep effective nodes
         # ob_mask = tf.cast(tf.transpose(tf.reduce_sum(ob['node'],axis=-1),[0,2,1]),dtype=tf.bool) # B*n*1
         ob_len = tf.reduce_sum(tf.squeeze(tf.reduce_sum(ob['node'], axis=-1),axis=-2),axis=-1)  # B
-        ob_len_first = ob_len-atom_type_num # todo: add a parameter for 3, number of node types
+        ob_len_first = ob_len-atom_type_num
         logits_mask = tf.sequence_mask(ob_len, maxlen=tf.shape(ob['node'])[2]) # mask all valid entry
         logits_first_mask = tf.sequence_mask(ob_len_first,maxlen=tf.shape(ob['node'])[2]) # mask valid entry -3 (rm isolated nodes)
 
@@ -127,6 +134,7 @@ class GCNPolicy(object):
         ### 3.2: select second node
         # rules: do not select first node
         # using own prediction
+        # todo: try MLP rather than bilinear
         self.logits_second = tf.transpose(bilinear(emb_first, emb_node, name='logits_second'), [0, 2, 1])
         self.logits_second = tf.squeeze(self.logits_second, axis=-1)
         ac_first_mask = tf.one_hot(ac_first, depth=tf.shape(emb_node)[1], dtype=tf.bool, on_value=False, off_value=True)
@@ -141,6 +149,7 @@ class GCNPolicy(object):
         emb_second = tf.expand_dims(emb_second, axis=1)
 
         # using groudtruth
+        # todo: try MLP rather than bilinear
         self.logits_second_real = tf.transpose(bilinear(emb_first_real, emb_node, name='logits_second'), [0, 2, 1])
         self.logits_second_real = tf.squeeze(self.logits_second_real, axis=-1)
         ac_first_mask_real = tf.one_hot(ac_first_real, depth=tf.shape(emb_node)[1], dtype=tf.bool, on_value=False, off_value=True)
@@ -154,20 +163,16 @@ class GCNPolicy(object):
 
         ### 3.3 predict edge type
         # using own prediction
+        # todo: try MLP rather than bilinear
         self.logits_edge = tf.reshape(bilinear_multi(emb_first,emb_second,out_dim=ob['adj'].get_shape()[1]),[-1,ob['adj'].get_shape()[1]])
         pd_edge = CategoricalPdType(-1).pdfromflat(self.logits_edge)
         ac_edge = pd_edge.sample()
 
         # using ground truth
+        # todo: try MLP rather than bilinear
         self.logits_edge_real = tf.reshape(bilinear_multi(emb_first_real, emb_second_real, out_dim=ob['adj'].get_shape()[1]),
                                       [-1, ob['adj'].get_shape()[1]])
 
-        print('ob_adj', ob['adj'].get_shape(),
-              'ob_node', ob['node'].get_shape())
-        print('logits_first', self.logits_first.get_shape(),
-              'logits_second',self.logits_second.get_shape(),
-              'logits_edge', self.logits_edge.get_shape())
-        print('ac_edge', ac_edge.get_shape())
 
         # ncat_list = [tf.shape(logits_first),ob_space['adj'].shape[-1],ob_space['adj'].shape[0]]
         self.pd = self.pdtype(-1).pdfromflat([self.logits_first,self.logits_second_real,self.logits_edge_real])
@@ -179,6 +184,15 @@ class GCNPolicy(object):
         self.state_out = []
 
         self.ac = tf.concat((tf.expand_dims(ac_first,axis=1),tf.expand_dims(ac_second,axis=1),tf.expand_dims(ac_edge,axis=1)),axis=1)
+
+        print('ob_adj', ob['adj'].get_shape(),
+              'ob_node', ob['node'].get_shape())
+        print('logits_first', self.logits_first.get_shape(),
+              'logits_second', self.logits_second.get_shape(),
+              'logits_edge', self.logits_edge.get_shape())
+        print('ac_edge', ac_edge.get_shape())
+        for var in tf.trainable_variables():
+            print('variable', var)
 
         debug = {}
         debug['ob_node'] = tf.shape(ob['node'])

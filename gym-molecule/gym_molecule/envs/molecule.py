@@ -49,8 +49,14 @@ class MoleculeEnv(gym.Env):
     # todo: seed()
 
     def __init__(self):
-        # possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
-        possible_atoms = ['C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl', 'Br']  # ZINC
+        ## todo: don't know how to pass argument to gym env yet..
+        data_type = 'gdb'
+        # data_type = 'zinc'
+        if data_type=='gdb':
+            possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
+        elif data_type=='zinc':
+            possible_atoms = ['C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
+                              'Br']  # ZINC
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.mol = Chem.RWMol()
@@ -60,10 +66,12 @@ class MoleculeEnv(gym.Env):
         self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
         # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
 
-        # self.max_atom = 13 + len(possible_atoms) # gdb 13
-        self.max_atom = 38 + len(possible_atoms) # ZINC
+        if data_type=='gdb':
+            self.max_atom = 13 + len(possible_atoms) # gdb 13
+        elif data_type=='zinc':
+            self.max_atom = 38 + len(possible_atoms) # ZINC
         self.max_action = 200
-        self.logp_ratio = 5
+        self.logp_ratio = 1
         self.qed_ratio = 1
         self.sa_ratio = -0.1
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
@@ -75,10 +83,12 @@ class MoleculeEnv(gym.Env):
 
         ## load expert data
         cwd = os.path.dirname(__file__)
-        path = os.path.join(os.path.dirname(cwd), 'dataset',
-                            'gdb13.rand1M.smi.gz')  # gdb 13
-        # path = os.path.join(os.path.dirname(cwd), 'dataset',
-        #                     '250k_rndm_zinc_drugs_clean.smi')  # ZINC
+        if data_type=='gdb':
+            path = os.path.join(os.path.dirname(cwd), 'dataset',
+                                'gdb13.rand1M.smi.gz')  # gdb 13
+        elif data_type=='zinc':
+            path = os.path.join(os.path.dirname(cwd), 'dataset',
+                                '250k_rndm_zinc_drugs_clean.smi')  # ZINC
         self.dataset = gdb_dataset(path)
 
 
@@ -158,7 +168,7 @@ class MoleculeEnv(gym.Env):
                     reward_qed = -1
                     reward_logp = -1
                     reward_sa = 10
-                    print('error')
+                    print('reward error')
 
                 #TODO(Bowen): synthetic accessibility metric to optimize
             new = True # end of episode
@@ -166,7 +176,7 @@ class MoleculeEnv(gym.Env):
             # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
             # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
             reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
-            smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+            # smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
             # print('counter', self.counter, 'new', new, 'reward', reward)
             # print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
             # print('smile',smile)
@@ -311,11 +321,17 @@ class MoleculeEnv(gym.Env):
     def get_info(self):
         info = {}
         info['smile'] = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-        info['reward_qed'] = qed(self.mol) * self.qed_ratio
-        info['reward_logp'] = Chem.Crippen.MolLogP(self.mol) / self.mol.GetNumAtoms() * self.logp_ratio  # arbitrary choice
-        s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-        m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
-        info['reward_sa'] = calculateScore(m) * self.sa_ratio  # lower better
+        try:
+            info['reward_qed'] = qed(self.mol) * self.qed_ratio
+            info['reward_logp'] = Chem.Crippen.MolLogP(self.mol) / self.mol.GetNumAtoms() * self.logp_ratio  # arbitrary choice
+            s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+            m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+            info['reward_sa'] = calculateScore(m) * self.sa_ratio  # lower better
+        except:
+            info['reward_qed'] = -1 * self.qed_ratio
+            info['reward_logp'] = -1 * self.logp_ratio
+            info['reward_sa'] = 10 * self.sa_ratio
+
         info['reward_sum'] = info['reward_qed'] + info['reward_logp'] + info['reward_sa']
         info['qed_ratio'] = self.qed_ratio
         info['logp_ratio'] = self.logp_ratio
@@ -758,6 +774,13 @@ if __name__ == '__main__':
     ob,ac = env.get_expert(4)
     print(ob)
     print(ac)
+
+    atom_list = []
+    bond_list = []
+    for i in range(100):
+        atom_list.append(env.dataset[i].GetNumAtoms())
+        bond_list.append(env.dataset[i].GetNumBonds())
+    print(max(atom_list),max(bond_list))
 
     # env.step(np.array([[0,3,0]]))
     # env.step(np.array([[1,4,0]]))
