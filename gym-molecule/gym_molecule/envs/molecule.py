@@ -133,7 +133,7 @@ class MoleculeEnv(gym.Env):
         # calculate terminal rewards
         if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action:
             #  some arbitrary termination condition for episode
-            print('start terminal rewards')
+            # print('start terminal rewards')
 
             # default reward for invalid molecule. Will be overwritten
             # with proper values if molecule is valid
@@ -145,41 +145,41 @@ class MoleculeEnv(gym.Env):
             if self.check_chemical_validity():  # chemically valid
                 # final mol object where any radical electrons are changed to
                 # bonds to hydrogen
-                print('check chemical validity passed!')
+                # print('check chemical validity passed!')
                 final_mol = self.get_final_mol()
                 # sanitize
                 s = Chem.MolToSmiles(final_mol, isomericSmiles=True)
-                print(s)
+                # print(s)
                 final_mol = Chem.MolFromSmiles(s)
-                # if steric_strain_filter(final_mol):  # passes 3D conversion
-                # test and no excessive strain
-                print('check steric strain passed!')
-                if zinc_molecule_filter(final_mol):  # does not contain any
-                    # problematic functional groups
-                    print('check zinc filter passed!')
-                    reward_valid = 0    # arbitrary choice
+                if steric_strain_filter(final_mol):  # passes 3D conversion
+                    # test and no excessive strain
+                    # print('check steric strain passed!')
+                    if zinc_molecule_filter(final_mol):  # does not contain any
+                        # problematic functional groups
+                        # print('check zinc filter passed!')
+                        reward_valid = 0    # arbitrary choice
 
 
-                    # Property rewards. Should only come into effect if
-                    # the we have determined the molecule is valid
-                    try:
-                        print('start property rewards')
-                        # 1. QED reward. Can have values [0, 1]. Higher the
-                        # better
-                        reward_qed = qed(final_mol)
+                        # Property rewards. Should only come into effect if
+                        # the we have determined the molecule is valid
+                        try:
+                            # print('start property rewards')
+                            # 1. QED reward. Can have values [0, 1]. Higher the
+                            # better
+                            reward_qed = qed(final_mol)
 
-                        print('qed reward complete!')
-                        # 2. Synthetic accessibility reward. Values naively
-                        # normalized to [0, 1]. Higher the better
-                        sa = -1 * calculateScore(final_mol)
-                        reward_sa = (sa + 10) / (10 - 1)
+                            # print('qed reward complete!')
+                            # 2. Synthetic accessibility reward. Values naively
+                            # normalized to [0, 1]. Higher the better
+                            sa = -1 * calculateScore(final_mol)
+                            reward_sa = (sa + 10) / (10 - 1)
 
-                        print('sa reward complete!')
-                    except: # if any property reward error, reset all
-                        # property rewards
-                        reward_qed = 0
-                        reward_sa = 0
-                        print('reward error')
+                            # print('sa reward complete!')
+                        except: # if any property reward error, reset all
+                            # property rewards
+                            reward_qed = 0
+                            reward_sa = 0
+                            # print('reward error')
 
             # # check chemical validity of final molecule (valency, as well as
             # # other rdkit molecule checks, such as aromaticity)
@@ -609,10 +609,10 @@ def steric_strain_filter(mol, cutoff=0.82,
     try:
         flag = AllChem.EmbedMolecule(m_h, maxAttempts=max_attempts_embed)
         if flag == -1:
-            print("Unable to generate 3d conformer")
+            # print("Unable to generate 3d conformer")
             return False
     except: # to catch error caused by molecules such as C=[SH]1=C2OC21ON(N)OC(=O)NO
-        print("Unable to generate 3d conformer")
+        # print("Unable to generate 3d conformer")
         return False
 
     # set up the forcefield
@@ -622,17 +622,17 @@ def steric_strain_filter(mol, cutoff=0.82,
         try:    # to deal with molecules such as CNN1NS23(=C4C5=C2C(=C53)N4Cl)S1
             ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
         except:
-            print("Unable to get forcefield or sanitization error")
+            # print("Unable to get forcefield or sanitization error")
             return False
     else:
-        print("Unrecognized atom type")
+        # print("Unrecognized atom type")
         return False
 
     # minimize steric energy
     try:
         ff.Minimize(maxIts=max_num_iters)
     except:
-        print("Minimization error")
+        # print("Minimization error")
         return False
 
     # ### debug ###
