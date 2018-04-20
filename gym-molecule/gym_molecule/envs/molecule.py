@@ -14,7 +14,7 @@ import networkx as nx
 from gym_molecule.envs.sascorer import calculateScore
 from gym_molecule.dataset.dataset_utils import gdb_dataset,mol_to_nx,nx_to_mol
 import random
-import timne
+import time
 
 from contextlib import contextmanager
 import sys, os
