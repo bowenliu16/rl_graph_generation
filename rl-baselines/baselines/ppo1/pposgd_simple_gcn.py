@@ -240,7 +240,7 @@ def learn(args,env, policy_fn, *,
         # logger.log("********** Iteration %i ************"%iters_so_far)
         if MPI.COMM_WORLD.Get_rank() == 0:
             with open('molecule_gen/' + args.dataset+'_'+args.name + '.csv', 'a') as f:
-                f.write('***** Iteration {} *****'.format(iters_so_far))
+                f.write('***** Iteration {} *****\n'.format(iters_so_far))
         if iters_so_far>=0:
             ## Expert train
             losses = []  # list of tuples, each of which gives the loss for a minibatch
