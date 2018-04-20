@@ -56,7 +56,7 @@ def arg_parser():
     return argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-def atari_arg_parser():
+def molecule_arg_parser():
     """
     Create an argparse.ArgumentParser for run_atari.py.
     """
@@ -71,7 +71,7 @@ def atari_arg_parser():
     return parser
 
 def main():
-    args = atari_arg_parser().parse_args()
+    args = molecule_arg_parser().parse_args()
     # check and clean
     if not os.path.exists('molecule_gen'):
         os.makedirs('molecule_gen')
