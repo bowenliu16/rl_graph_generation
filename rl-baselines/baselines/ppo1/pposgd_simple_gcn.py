@@ -65,15 +65,15 @@ def traj_segment_generator(args, pi, env, horizon, stochastic):
         acs[i] = ac
         prevacs[i] = prevac
 
-        ob, rew, new, _ = env.step(ac)
+        ob, rew, new, info = env.step(ac)
         rews[i] = rew
 
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
-            info = env.get_info()
             with open('molecule_gen/'+args.name+'.csv', 'a') as f:
-                f.write('{},{},{},{},{},{},{},{}\n'.format(info['smile'],info['reward_qed'],info['reward_logp'],info['reward_sa'],info['reward_sum'],info['qed_ratio'],info['logp_ratio'],info['sa_ratio']))
+                str = ''.join(['{},']*len(info))[:-1]+'\n'
+                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward']))
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             cur_ep_ret = 0
@@ -238,6 +238,9 @@ def learn(args,env, policy_fn, *,
             raise NotImplementedError
 
         # logger.log("********** Iteration %i ************"%iters_so_far)
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            with open('molecule_gen/' + args.name + '.csv', 'a') as f:
+                f.write('***** Iteration {} *****'.format(iters_so_far))
         if iters_so_far>=0:
             ## Expert train
             losses = []  # list of tuples, each of which gives the loss for a minibatch

@@ -72,10 +72,10 @@ def main():
     # check and clean
     if not os.path.exists('molecule_gen'):
         os.makedirs('molecule_gen')
-    # new
-    with open('molecule_gen/' + args.name + '.csv', 'a') as f:
-        f.write('{},{},{},{},{},{},{},{}\n'.format('smile', 'reward_qed', 'reward_logp','reward_sa', 'reward_sum', 'qed_ratio',
-                                                   'logp_ratio', 'sa_ratio'))
+    # # new
+    # with open('molecule_gen/' + args.name + '.csv', 'a') as f:
+    #     f.write('{},{},{},{},{},{},{},{}\n'.format('smile', 'reward_qed', 'reward_logp','reward_sa', 'reward_sum', 'qed_ratio',
+    #                                                'logp_ratio', 'sa_ratio'))
 
     # only keep first worker result in tensorboard
     if MPI.COMM_WORLD.Get_rank() == 0:

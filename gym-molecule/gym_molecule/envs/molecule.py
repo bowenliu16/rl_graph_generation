@@ -53,8 +53,8 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         ## todo: don't know how to pass argument to gym env yet..
-        data_type = 'gdb'
-        # data_type = 'zinc'
+        # data_type = 'gdb'
+        data_type = 'zinc'
         if data_type=='gdb':
             possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
         elif data_type=='zinc':
@@ -122,11 +122,11 @@ class MoleculeEnv(gym.Env):
             # calculate intermediate rewards
             if self.check_valency():
                 if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
-                    reward_step = 1/self.max_atom
+                    reward_step = 0.5/self.max_atom
                 else:
-                    reward_step = -1/self.max_atom
+                    reward_step = -0.5/self.max_atom
             else:
-                reward_step = -1/self.max_atom  # arbitrary choice
+                reward_step = -0.5/self.max_atom  # arbitrary choice
                 self.mol = self.mol_old
 
             # calculate terminal rewards
@@ -156,7 +156,7 @@ class MoleculeEnv(gym.Env):
                         if zinc_molecule_filter(final_mol):  # does not contain any
                             # problematic functional groups
                             print('check zinc filter passed!')
-                            reward_valid = 1    # arbitrary choice
+                            reward_valid = 0    # arbitrary choice
 
 
                             # Property rewards. Should only come into effect if
@@ -227,7 +227,7 @@ class MoleculeEnv(gym.Env):
                 # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
                 # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
                 # reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
-                reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_sa*self.sa_ratio
+                reward = reward_step + reward_valid + reward_qed + reward_sa
                 # smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
                 # print('counter', self.counter, 'new', new, 'reward', reward)
                 # print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
@@ -242,6 +242,12 @@ class MoleculeEnv(gym.Env):
             ob = self.get_observation()
 
             info = {} # info we care about
+            info['smile'] = self.get_final_smiles()
+            info['reward_valid'] = reward_valid
+            info['reward_qed'] = reward_qed
+            info['reward_sa'] = reward_sa
+            info['reward'] = reward
+
 
             self.counter += 1
             if new:
@@ -372,28 +378,28 @@ class MoleculeEnv(gym.Env):
         m = convert_radical_electrons_to_hydrogens(self.mol)
         return m
 
-    # TODO: modify this to coincide with the rewards in the step. Do we need
-    # to do the radical conversion here, or has the mol object already been
-    # modified in place?
-    def get_info(self):
-        info = {}
-        info['smile'] = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-        try:
-            info['reward_qed'] = qed(self.mol) * self.qed_ratio
-            info['reward_logp'] = Chem.Crippen.MolLogP(self.mol) / self.mol.GetNumAtoms() * self.logp_ratio  # arbitrary choice
-            s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-            m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
-            info['reward_sa'] = calculateScore(m) * self.sa_ratio  # lower better
-        except:
-            info['reward_qed'] = -1 * self.qed_ratio
-            info['reward_logp'] = -1 * self.logp_ratio
-            info['reward_sa'] = 10 * self.sa_ratio
-
-        info['reward_sum'] = info['reward_qed'] + info['reward_logp'] + info['reward_sa']
-        info['qed_ratio'] = self.qed_ratio
-        info['logp_ratio'] = self.logp_ratio
-        info['sa_ratio'] = self.sa_ratio
-        return info
+    # # TODO: modify this to coincide with the rewards in the step. Do we need
+    # # to do the radical conversion here, or has the mol object already been
+    # # modified in place?
+    # def get_info(self):
+    #     info = {}
+    #     info['smile'] = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+    #     try:
+    #         info['reward_qed'] = qed(self.mol) * self.qed_ratio
+    #         info['reward_logp'] = Chem.Crippen.MolLogP(self.mol) / self.mol.GetNumAtoms() * self.logp_ratio  # arbitrary choice
+    #         s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+    #         m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+    #         info['reward_sa'] = calculateScore(m) * self.sa_ratio  # lower better
+    #     except:
+    #         info['reward_qed'] = -1 * self.qed_ratio
+    #         info['reward_logp'] = -1 * self.logp_ratio
+    #         info['reward_sa'] = 10 * self.sa_ratio
+    #
+    #     info['reward_sum'] = info['reward_qed'] + info['reward_logp'] + info['reward_sa']
+    #     info['qed_ratio'] = self.qed_ratio
+    #     info['logp_ratio'] = self.logp_ratio
+    #     info['sa_ratio'] = self.sa_ratio
+    #     return info
 
     def get_matrices(self):
         """
