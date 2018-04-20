@@ -26,7 +26,7 @@ def train(args,env_id, num_timesteps, seed,writer=None):
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
     env = gym.make('molecule-v0')
-    env.init(args.dataset) # remember call this after gym.make!!
+    env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total) # remember call this after gym.make!!
     print(env.observation_space)
     def policy_fn(name, ob_space, ac_space): #pylint: disable=W0613
         # return cnn_policy.CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
@@ -67,6 +67,10 @@ def molecule_arg_parser():
     parser.add_argument('--num-timesteps', type=int, default=int(10e7))
     parser.add_argument('--name', type=str, default='test')
     parser.add_argument('--dataset', type=str, default='zinc')
+    parser.add_argument('--logp_ratio', type=float, default=1)
+    parser.add_argument('--qed_ratio', type=float, default=1)
+    parser.add_argument('--sa_ratio', type=float, default=1)
+    parser.add_argument('--reward_step_total', type=float, default=1)
 
     return parser
 

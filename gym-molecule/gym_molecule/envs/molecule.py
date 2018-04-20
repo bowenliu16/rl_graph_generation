@@ -168,7 +168,7 @@ class MoleculeEnv(gym.Env):
                     sa = -1 * calculateScore(final_mol)
                     reward_sa += (sa + 10) / (10 - 1) * self.sa_ratio
                     # 3. Logp reward. Higher the better
-                    reward_logp += Chem.Crippen.MolLogP(self.mol)/self.mol.GetNumAtoms() * self.logp_ratio
+                    reward_logp += Chem.Crippen.MolLogP(self.mol)/10 * self.logp_ratio
                 except: # if any property reward error, reset all
                     print('reward error')
 
