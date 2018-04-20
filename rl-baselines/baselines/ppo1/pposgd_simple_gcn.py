@@ -239,7 +239,7 @@ def learn(args,env, policy_fn, *,
 
         # logger.log("********** Iteration %i ************"%iters_so_far)
         if MPI.COMM_WORLD.Get_rank() == 0:
-            with open('molecule_gen/' + args.name + '.csv', 'a') as f:
+            with open('molecule_gen/' + args.dataset+'_'+args.name + '.csv', 'a') as f:
                 f.write('***** Iteration {} *****'.format(iters_so_far))
         if iters_so_far>=0:
             ## Expert train
