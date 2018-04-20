@@ -19,6 +19,7 @@ import time
 from contextlib import contextmanager
 import sys, os
 
+# block std out
 @contextmanager
 def nostdout():
     with open(os.devnull, "w") as devnull:
@@ -53,9 +54,13 @@ class MoleculeEnv(gym.Env):
     # todo: seed()
 
     def __init__(self):
-        ## todo: don't know how to pass argument to gym env yet..
-        # data_type = 'gdb'
-        data_type = 'zinc'
+        pass
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1):
+        '''
+        own init function, since gym does not support passing argument
+        '''
+
+        self.mol = Chem.RWMol()
         if data_type=='gdb':
             possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
         elif data_type=='zinc':
@@ -63,21 +68,18 @@ class MoleculeEnv(gym.Env):
                               'Br']  # ZINC
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
-        self.mol = Chem.RWMol()
-        self.possible_atom_types = np.array(possible_atoms)  # dim d_n. Array that
-        self.atom_type_num = len(possible_atoms)
-        # contains the possible atom symbols strs
-        self.possible_bond_types = np.array(possible_bonds, dtype=object)  # dim
-        # d_e. Array that contains the possible rdkit.Chem.rdchem.BondType objects
+        self.possible_atom_types = np.array(possible_atoms)
+        self.possible_bond_types = np.array(possible_bonds, dtype=object)
 
         if data_type=='gdb':
             self.max_atom = 13 + len(possible_atoms) # gdb 13
         elif data_type=='zinc':
             self.max_atom = 38 + len(possible_atoms) # ZINC
         self.max_action = 200
-        self.logp_ratio = 1
-        self.qed_ratio = 1
-        self.sa_ratio = -0.1
+        self.logp_ratio = logp_ratio
+        self.qed_ratio = qed_ratio
+        self.sa_ratio = sa_ratio
+        self.reward_step_total = reward_step_total
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
         self.observation_space = {}
         self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
@@ -106,13 +108,12 @@ class MoleculeEnv(gym.Env):
         :return: reward of 1 if resulting molecule graph does not exceed valency,
         -1 if otherwise
         """
+        ### init
         info = {}  # info we care about
-
-        self.mol_old = copy.deepcopy(self.mol)
-        # print('num atoms',self.mol.GetNumAtoms())
+        self.mol_old = copy.deepcopy(self.mol) # keep old mol
         total_atoms = self.mol.GetNumAtoms()
-        # take action
 
+        ### take action
         if action[0, 1] >= total_atoms:
             self._add_atom(action[0, 1] - total_atoms)  # add new node
             action[0, 1] = total_atoms  # new node id
@@ -120,67 +121,68 @@ class MoleculeEnv(gym.Env):
         else:
             self._add_bond(action)  # add new edge
 
-        # calculate intermediate rewards
+        ### calculate intermediate rewards
         if self.check_valency():
             if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
-                reward_step = 1/self.max_atom
+                reward_step = self.reward_step_total/self.max_atom # successfully add node/edge
             else:
-                reward_step = -1/self.max_atom
+                reward_step = -self.reward_step_total/self.max_atom # edge exist
         else:
-            reward_step = -1/self.max_atom  # arbitrary choice
+            reward_step = -self.reward_step_total/self.max_atom  # invalid action
             self.mol = self.mol_old
 
-        # calculate terminal rewards
+        ### calculate terminal rewards
+        # todo: add terminal action
         if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action:
-            #  some arbitrary termination condition for episode
-            # print('start terminal rewards')
-
-            # default reward for invalid molecule. Will be overwritten
-            # with proper values if molecule is valid
-            reward_valid = -10  # arbitrary choice
+            # default reward
+            reward_valid = 0
             reward_qed = 0
             reward_sa = 0
+            reward_logp = 0
+            flag_steric_strain_filter = True
+            flag_zinc_molecule_filter = True
 
-            # rewards for valid molecule
-            if self.check_chemical_validity():  # chemically valid
-                # final mol object where any radical electrons are changed to
-                # bonds to hydrogen
-                # print('check chemical validity passed!')
+            if not self.check_chemical_validity():
+                reward_valid -= 10
+            else:
+                # final mol object where any radical electrons are changed to bonds to hydrogen
                 final_mol = self.get_final_mol()
-                # sanitize
                 s = Chem.MolToSmiles(final_mol, isomericSmiles=True)
-                # print(s)
                 final_mol = Chem.MolFromSmiles(s)
-                if steric_strain_filter(final_mol):  # passes 3D conversion
-                    # test and no excessive strain
-                    # print('check steric strain passed!')
-                    if zinc_molecule_filter(final_mol):  # does not contain any
-                        # problematic functional groups
-                        # print('check zinc filter passed!')
-                        reward_valid = 1    # arbitrary choice
+
+                # mol filters with negative rewards
+                if not steric_strain_filter(final_mol):  # passes 3D conversion, no excessive strain
+                    reward_valid -= 3
+                    flag_steric_strain_filter = False
+                if not zinc_molecule_filter(final_mol):  # does not contain any problematic functional groups
+                    reward_valid -= 3
+                    flag_zinc_molecule_filter = False
 
 
-                        # Property rewards. Should only come into effect if
-                        # the we have determined the molecule is valid
-                        try:
-                            # print('start property rewards')
-                            # 1. QED reward. Can have values [0, 1]. Higher the
-                            # better
-                            reward_qed = qed(final_mol)
+                # property rewards
+                try:
+                    # 1. QED reward. Can have values [0, 1]. Higher the better
+                    reward_qed += qed(final_mol)*self.qed_ratio
+                    # 2. Synthetic accessibility reward. Values naively normalized to [0, 1]. Higher the better
+                    sa = -1 * calculateScore(final_mol)
+                    reward_sa += (sa + 10) / (10 - 1) * self.sa_ratio
+                    # 3. Logp reward. Higher the better
+                    reward_logp += Chem.Crippen.MolLogP(self.mol)/self.mol.GetNumAtoms() * self.logp_ratio
+                except: # if any property reward error, reset all
+                    print('reward error')
 
-                            # print('qed reward complete!')
-                            # 2. Synthetic accessibility reward. Values naively
-                            # normalized to [0, 1]. Higher the better
-                            sa = -1 * calculateScore(final_mol)
-                            reward_sa = (sa + 10) / (10 - 1)
+            new = True # end of episode
+            reward = reward_step + reward_valid + reward_qed + reward_sa + reward_logp
+            info['smile'] = self.get_final_smiles()
+            info['reward_valid'] = reward_valid
+            info['reward_qed'] = reward_qed
+            info['reward_sa'] = reward_sa
+            info['reward_logp'] = reward_logp
+            info['reward'] = reward
+            info['flag_steric_strain_filter'] = flag_steric_strain_filter
+            info['flag_zinc_molecule_filter'] = flag_zinc_molecule_filter
 
-                            # print('sa reward complete!')
-                        except: # if any property reward error, reset all
-                            # property rewards
-                            reward_qed = 0
-                            reward_sa = 0
-                            # print('reward error')
-
+            ## old version
             # # check chemical validity of final molecule (valency, as well as
             # # other rdkit molecule checks, such as aromaticity)
             # if not self.check_chemical_validity():
@@ -223,39 +225,20 @@ class MoleculeEnv(gym.Env):
             #         reward_sa = 10
             #         print('reward error')
 
-            new = True # end of episode
-            # reward = reward_step + reward_valid + reward_logp +reward_qed*self.qed_ratio
-            # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
-            # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
-            # reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
-            reward = reward_step + reward_valid + reward_qed + reward_sa
-            # smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-            # print('counter', self.counter, 'new', new, 'reward', reward)
-            # print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
-            # print('smile',smile)
-            info['smile'] = self.get_final_smiles()
-            info['reward_valid'] = reward_valid
-            info['reward_qed'] = reward_qed
-            info['reward_sa'] = reward_sa
-            info['reward'] = reward
+        ### use stepwise reward
         else:
             new = False
             # print('counter', self.counter, 'new', new, 'reward_step', reward_step)
             reward = reward_step
 
-
         # get observation
         ob = self.get_observation()
-
-
-
 
         self.counter += 1
         if new:
             self.counter = 0
 
         return ob,reward,new,info
-
 
 
     def reset(self):
@@ -854,6 +837,7 @@ def reward_target_molecule_similarity(mol, target, radius=2, nBits=2048,
 
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
+    env.init()
 
     ob = env.reset()
     print(ob['adj'].shape)

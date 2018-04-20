@@ -264,6 +264,7 @@ if __name__ == "__main__":
 
     stochastic = True
     env = gym.make('molecule-v0')  # in gym format
+    env.init()
     ob = env.reset()
 
     # ob['adj'] = np.repeat(ob['adj'][None],2,axis=0)
