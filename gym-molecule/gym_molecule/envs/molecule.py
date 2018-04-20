@@ -14,6 +14,7 @@ import networkx as nx
 from gym_molecule.envs.sascorer import calculateScore
 from gym_molecule.dataset.dataset_utils import gdb_dataset,mol_to_nx,nx_to_mol
 import random
+import timne
 
 from contextlib import contextmanager
 import sys, os
@@ -150,35 +151,35 @@ class MoleculeEnv(gym.Env):
                 s = Chem.MolToSmiles(final_mol, isomericSmiles=True)
                 print(s)
                 final_mol = Chem.MolFromSmiles(s)
-                if steric_strain_filter(final_mol):  # passes 3D conversion
-                    # test and no excessive strain
-                    print('check steric strain passed!')
-                    if zinc_molecule_filter(final_mol):  # does not contain any
-                        # problematic functional groups
-                        print('check zinc filter passed!')
-                        reward_valid = 0    # arbitrary choice
+                # if steric_strain_filter(final_mol):  # passes 3D conversion
+                # test and no excessive strain
+                print('check steric strain passed!')
+                if zinc_molecule_filter(final_mol):  # does not contain any
+                    # problematic functional groups
+                    print('check zinc filter passed!')
+                    reward_valid = 0    # arbitrary choice
 
 
-                        # Property rewards. Should only come into effect if
-                        # the we have determined the molecule is valid
-                        try:
-                            print('start property rewards')
-                            # 1. QED reward. Can have values [0, 1]. Higher the
-                            # better
-                            reward_qed = qed(final_mol)
+                    # Property rewards. Should only come into effect if
+                    # the we have determined the molecule is valid
+                    try:
+                        print('start property rewards')
+                        # 1. QED reward. Can have values [0, 1]. Higher the
+                        # better
+                        reward_qed = qed(final_mol)
 
-                            print('qed reward complete!')
-                            # 2. Synthetic accessibility reward. Values naively
-                            # normalized to [0, 1]. Higher the better
-                            sa = -1 * calculateScore(final_mol)
-                            reward_sa = (sa + 10) / (10 - 1)
+                        print('qed reward complete!')
+                        # 2. Synthetic accessibility reward. Values naively
+                        # normalized to [0, 1]. Higher the better
+                        sa = -1 * calculateScore(final_mol)
+                        reward_sa = (sa + 10) / (10 - 1)
 
-                            print('sa reward complete!')
-                        except: # if any property reward error, reset all
-                            # property rewards
-                            reward_qed = 0
-                            reward_sa = 0
-                            print('reward error')
+                        print('sa reward complete!')
+                    except: # if any property reward error, reset all
+                        # property rewards
+                        reward_qed = 0
+                        reward_sa = 0
+                        print('reward error')
 
             # # check chemical validity of final molecule (valency, as well as
             # # other rdkit molecule checks, such as aromaticity)
