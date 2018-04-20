@@ -68,6 +68,7 @@ class MoleculeEnv(gym.Env):
                               'Br']  # ZINC
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
+        self.atom_type_num = len(possible_atoms)
         self.possible_atom_types = np.array(possible_atoms)
         self.possible_bond_types = np.array(possible_bonds, dtype=object)
 
