@@ -99,163 +99,162 @@ class MoleculeEnv(gym.Env):
     # to be printed when running run_molecules.py. For debugging only
     def step(self, action):
         """
-            Perform a given action
-            :param action:
-            :param action_type:
-            :return: reward of 1 if resulting molecule graph does not exceed valency,
-            -1 if otherwise
-            """
-        try:
+        Perform a given action
+        :param action:
+        :param action_type:
+        :return: reward of 1 if resulting molecule graph does not exceed valency,
+        -1 if otherwise
+        """
+        info = {}  # info we care about
 
-            self.mol_old = copy.deepcopy(self.mol)
-            # print('num atoms',self.mol.GetNumAtoms())
-            total_atoms = self.mol.GetNumAtoms()
-            # take action
+        self.mol_old = copy.deepcopy(self.mol)
+        # print('num atoms',self.mol.GetNumAtoms())
+        total_atoms = self.mol.GetNumAtoms()
+        # take action
 
-            if action[0, 1] >= total_atoms:
-                self._add_atom(action[0, 1] - total_atoms)  # add new node
-                action[0, 1] = total_atoms  # new node id
-                self._add_bond(action)  # add new edge
+        if action[0, 1] >= total_atoms:
+            self._add_atom(action[0, 1] - total_atoms)  # add new node
+            action[0, 1] = total_atoms  # new node id
+            self._add_bond(action)  # add new edge
+        else:
+            self._add_bond(action)  # add new edge
+
+        # calculate intermediate rewards
+        if self.check_valency():
+            if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
+                reward_step = 0.5/self.max_atom
             else:
-                self._add_bond(action)  # add new edge
+                reward_step = -0.5/self.max_atom
+        else:
+            reward_step = -0.5/self.max_atom  # arbitrary choice
+            self.mol = self.mol_old
 
-            # calculate intermediate rewards
-            if self.check_valency():
-                if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
-                    reward_step = 0.5/self.max_atom
-                else:
-                    reward_step = -0.5/self.max_atom
-            else:
-                reward_step = -0.5/self.max_atom  # arbitrary choice
-                self.mol = self.mol_old
+        # calculate terminal rewards
+        if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action:
+            #  some arbitrary termination condition for episode
+            print('start terminal rewards')
 
-            # calculate terminal rewards
-            if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action:
-                #  some arbitrary termination condition for episode
-                print('start terminal rewards')
+            # default reward for invalid molecule. Will be overwritten
+            # with proper values if molecule is valid
+            reward_valid = -10  # arbitrary choice
+            reward_qed = 0
+            reward_sa = 0
 
-                # default reward for invalid molecule. Will be overwritten
-                # with proper values if molecule is valid
-                reward_valid = -10  # arbitrary choice
-                reward_qed = 0
-                reward_sa = 0
-
-                # rewards for valid molecule
-                if self.check_chemical_validity():  # chemically valid
-                    # final mol object where any radical electrons are changed to
-                    # bonds to hydrogen
-                    print('check chemical validity passed!')
-                    final_mol = self.get_final_mol()
-                    # sanitize
-                    s = Chem.MolToSmiles(final_mol, isomericSmiles=True)
-                    print(s)
-                    final_mol = Chem.MolFromSmiles(s)
-                    if steric_strain_filter(final_mol):  # passes 3D conversion
-                        # test and no excessive strain
-                        print('check steric strain passed!')
-                        if zinc_molecule_filter(final_mol):  # does not contain any
-                            # problematic functional groups
-                            print('check zinc filter passed!')
-                            reward_valid = 0    # arbitrary choice
+            # rewards for valid molecule
+            if self.check_chemical_validity():  # chemically valid
+                # final mol object where any radical electrons are changed to
+                # bonds to hydrogen
+                print('check chemical validity passed!')
+                final_mol = self.get_final_mol()
+                # sanitize
+                s = Chem.MolToSmiles(final_mol, isomericSmiles=True)
+                print(s)
+                final_mol = Chem.MolFromSmiles(s)
+                if steric_strain_filter(final_mol):  # passes 3D conversion
+                    # test and no excessive strain
+                    print('check steric strain passed!')
+                    if zinc_molecule_filter(final_mol):  # does not contain any
+                        # problematic functional groups
+                        print('check zinc filter passed!')
+                        reward_valid = 0    # arbitrary choice
 
 
-                            # Property rewards. Should only come into effect if
-                            # the we have determined the molecule is valid
-                            try:
-                                print('start property rewards')
-                                # 1. QED reward. Can have values [0, 1]. Higher the
-                                # better
-                                reward_qed = qed(final_mol)
+                        # Property rewards. Should only come into effect if
+                        # the we have determined the molecule is valid
+                        try:
+                            print('start property rewards')
+                            # 1. QED reward. Can have values [0, 1]. Higher the
+                            # better
+                            reward_qed = qed(final_mol)
 
-                                print('qed reward complete!')
-                                # 2. Synthetic accessibility reward. Values naively
-                                # normalized to [0, 1]. Higher the better
-                                sa = -1 * calculateScore(final_mol)
-                                reward_sa = (sa + 10) / (10 - 1)
+                            print('qed reward complete!')
+                            # 2. Synthetic accessibility reward. Values naively
+                            # normalized to [0, 1]. Higher the better
+                            sa = -1 * calculateScore(final_mol)
+                            reward_sa = (sa + 10) / (10 - 1)
 
-                                print('sa reward complete!')
-                            except: # if any property reward error, reset all
-                                # property rewards
-                                reward_qed = 0
-                                reward_sa = 0
-                                print('reward error')
+                            print('sa reward complete!')
+                        except: # if any property reward error, reset all
+                            # property rewards
+                            reward_qed = 0
+                            reward_sa = 0
+                            print('reward error')
 
-                # # check chemical validity of final molecule (valency, as well as
-                # # other rdkit molecule checks, such as aromaticity)
-                # if not self.check_chemical_validity():
-                #     reward_valid = -10 # arbitrary choice
-                #     reward_qed = 0
-                #     reward_logp = 0
-                #     reward_sa = 0
-                #     # reward_cycle = 0
-                # else:   # these metrics only work for valid molecules
-                #     # drug likeness metric to optimize. qed can have values [0, 1]
-                #     reward_valid = 1
-                #     try:
-                #         # reward_qed = 5**qed(self.mol)    # arbitrary choice of exponent
-                #         reward_qed = qed(self.mol)
-                #     # log p. Assume we want to increase log p. log p typically
-                #     # have values between -3 and 7
-                #         reward_logp = Chem.Crippen.MolLogP(self.mol)/self.mol.GetNumAtoms()    # arbitrary choice
-                #         s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-                #         m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
-                #         reward_sa = calculateScore(m) # lower better
-                #
-                #         # cycle_list = nx.cycle_basis(nx.Graph(Chem.GetAdjacencyMatrix(self.mol)))
-                #         # if len(cycle_list) == 0:
-                #         #     cycle_length = 0
-                #         # else:
-                #         #     cycle_length = max([len(j) for j in cycle_list])
-                #         # if cycle_length <= 6:
-                #         #     cycle_length = 0
-                #         # else:
-                #         #     cycle_length = cycle_length - 6
-                #         # reward_cycle = cycle_length
-                #
-                #         # if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]:
-                #         #     reward_sa = calculateScore(self.mol)
-                #         # else:
-                #         #     reward_sa = 0
-                #     except:
-                #         reward_qed = -1
-                #         reward_logp = -1
-                #         reward_sa = 10
-                #         print('reward error')
+            # # check chemical validity of final molecule (valency, as well as
+            # # other rdkit molecule checks, such as aromaticity)
+            # if not self.check_chemical_validity():
+            #     reward_valid = -10 # arbitrary choice
+            #     reward_qed = 0
+            #     reward_logp = 0
+            #     reward_sa = 0
+            #     # reward_cycle = 0
+            # else:   # these metrics only work for valid molecules
+            #     # drug likeness metric to optimize. qed can have values [0, 1]
+            #     reward_valid = 1
+            #     try:
+            #         # reward_qed = 5**qed(self.mol)    # arbitrary choice of exponent
+            #         reward_qed = qed(self.mol)
+            #     # log p. Assume we want to increase log p. log p typically
+            #     # have values between -3 and 7
+            #         reward_logp = Chem.Crippen.MolLogP(self.mol)/self.mol.GetNumAtoms()    # arbitrary choice
+            #         s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+            #         m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+            #         reward_sa = calculateScore(m) # lower better
+            #
+            #         # cycle_list = nx.cycle_basis(nx.Graph(Chem.GetAdjacencyMatrix(self.mol)))
+            #         # if len(cycle_list) == 0:
+            #         #     cycle_length = 0
+            #         # else:
+            #         #     cycle_length = max([len(j) for j in cycle_list])
+            #         # if cycle_length <= 6:
+            #         #     cycle_length = 0
+            #         # else:
+            #         #     cycle_length = cycle_length - 6
+            #         # reward_cycle = cycle_length
+            #
+            #         # if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]:
+            #         #     reward_sa = calculateScore(self.mol)
+            #         # else:
+            #         #     reward_sa = 0
+            #     except:
+            #         reward_qed = -1
+            #         reward_logp = -1
+            #         reward_sa = 10
+            #         print('reward error')
 
-                new = True # end of episode
-                # reward = reward_step + reward_valid + reward_logp +reward_qed*self.qed_ratio
-                # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
-                # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
-                # reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
-                reward = reward_step + reward_valid + reward_qed + reward_sa
-                # smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-                # print('counter', self.counter, 'new', new, 'reward', reward)
-                # print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
-                # print('smile',smile)
-            else:
-                new = False
-                # print('counter', self.counter, 'new', new, 'reward_step', reward_step)
-                reward = reward_step
-
-
-            # get observation
-            ob = self.get_observation()
-
-            info = {} # info we care about
+            new = True # end of episode
+            # reward = reward_step + reward_valid + reward_logp +reward_qed*self.qed_ratio
+            # reward = reward_step + reward_valid + reward_logp - reward_sa - reward_cycle
+            # reward = reward_step + reward_valid + reward_logp + reward_qed*self.qed_ratio - reward_sa*self.sa_ratio
+            # reward = reward_step + reward_valid + reward_qed*self.qed_ratio + reward_logp*self.logp_ratio + reward_sa*self.sa_ratio
+            reward = reward_step + reward_valid + reward_qed + reward_sa
+            # smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+            # print('counter', self.counter, 'new', new, 'reward', reward)
+            # print('reward_valid', reward_valid, 'reward_qed', reward_qed*self.qed_ratio, 'reward_logp', reward_logp*self.logp_ratio, 'reward_sa', reward_sa*self.sa_ratio, 'qed_ratio', self.qed_ratio,'logp_ratio', self.logp_ratio, 'sa_ratio', self.sa_ratio)
+            # print('smile',smile)
             info['smile'] = self.get_final_smiles()
             info['reward_valid'] = reward_valid
             info['reward_qed'] = reward_qed
             info['reward_sa'] = reward_sa
             info['reward'] = reward
+        else:
+            new = False
+            # print('counter', self.counter, 'new', new, 'reward_step', reward_step)
+            reward = reward_step
 
 
-            self.counter += 1
-            if new:
-                self.counter = 0
+        # get observation
+        ob = self.get_observation()
 
-            return ob,reward,new,info
 
-        except Exception as e: print(e)
+
+
+        self.counter += 1
+        if new:
+            self.counter = 0
+
+        return ob,reward,new,info
+
 
 
     def reset(self):
