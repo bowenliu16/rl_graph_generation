@@ -123,11 +123,11 @@ class MoleculeEnv(gym.Env):
         # calculate intermediate rewards
         if self.check_valency():
             if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
-                reward_step = 0.5/self.max_atom
+                reward_step = 1/self.max_atom
             else:
-                reward_step = -0.5/self.max_atom
+                reward_step = -1/self.max_atom
         else:
-            reward_step = -0.5/self.max_atom  # arbitrary choice
+            reward_step = -1/self.max_atom  # arbitrary choice
             self.mol = self.mol_old
 
         # calculate terminal rewards
@@ -157,7 +157,7 @@ class MoleculeEnv(gym.Env):
                     if zinc_molecule_filter(final_mol):  # does not contain any
                         # problematic functional groups
                         # print('check zinc filter passed!')
-                        reward_valid = 0    # arbitrary choice
+                        reward_valid = 1    # arbitrary choice
 
 
                         # Property rewards. Should only come into effect if
