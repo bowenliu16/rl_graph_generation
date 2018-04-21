@@ -71,6 +71,10 @@ def molecule_arg_parser():
     parser.add_argument('--qed_ratio', type=float, default=1)
     parser.add_argument('--sa_ratio', type=float, default=1)
     parser.add_argument('--reward_step_total', type=float, default=1)
+    parser.add_argument('--has_rl', type=int, default=1)
+    parser.add_argument('--has_expert', type=int, default=1)
+
+
 
     return parser
 

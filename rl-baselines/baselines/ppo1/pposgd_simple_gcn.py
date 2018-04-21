@@ -241,7 +241,7 @@ def learn(args,env, policy_fn, *,
         if MPI.COMM_WORLD.Get_rank() == 0:
             with open('molecule_gen/' + args.dataset+'_'+args.name + '.csv', 'a') as f:
                 f.write('***** Iteration {} *****\n'.format(iters_so_far))
-        if iters_so_far>=0:
+        if args.has_expert==1:
             ## Expert train
             losses = []  # list of tuples, each of which gives the loss for a minibatch
             for _ in range(optim_epochs*2):
@@ -264,7 +264,7 @@ def learn(args,env, policy_fn, *,
         d = Dataset(dict(ob_adj=ob_adj, ob_node=ob_node, ac=ac, atarg=atarg, vtarg=tdlamret), shuffle=not pi.recurrent)
         optim_batchsize = optim_batchsize or ob_adj.shape[0]
 
-        if iters_so_far>=0:
+        if args.has_rl==1:
             ## PPO train
             assign_old_eq_new() # set old parameter values to new parameter values
             # logger.log("Optimizing...")
