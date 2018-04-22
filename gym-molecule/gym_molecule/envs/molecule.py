@@ -248,7 +248,8 @@ class MoleculeEnv(gym.Env):
         :return: ob
         '''
         self.mol = Chem.RWMol()
-        self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
+        # self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
+        self._add_atom(0) # always add carbon first
         self.counter = 0
         ob = self.get_observation()
         return ob
