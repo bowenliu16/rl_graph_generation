@@ -93,12 +93,12 @@ def main():
         writer = SummaryWriter(comment='_'+args.dataset+'_'+args.name)
     else:
         writer = None
-    try:
-        train(args,args.env, num_timesteps=args.num_timesteps, seed=args.seed,writer=writer)
-    except:
-        writer.export_scalars_to_json("./all_scalars.json")
-        writer.close()
-        pass
+    # try:
+    train(args,args.env, num_timesteps=args.num_timesteps, seed=args.seed,writer=writer)
+    # except:
+    #     writer.export_scalars_to_json("./all_scalars.json")
+    #     writer.close()
+    #     pass
 
 if __name__ == '__main__':
     main()

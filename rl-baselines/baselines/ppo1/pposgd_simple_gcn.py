@@ -73,7 +73,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic):
         if new:
             with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
                 str = ''.join(['{},']*len(info))[:-1]+'\n'
-                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],info['reward'],info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter']))
+                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],info['reward'],info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             cur_ep_ret = 0
@@ -132,7 +132,7 @@ def learn(args,env, policy_fn, *,
 
     # ac = pi.pdtype.sample_placeholder([None])
     # ac = tf.placeholder(dtype=tf.int64,shape=env.action_space.nvec.shape)
-    ac = tf.placeholder(dtype=tf.int64, shape=[None,3],name='ac_real')
+    ac = tf.placeholder(dtype=tf.int64, shape=[None,4],name='ac_real')
 
     ## PPO loss
     kloldnew = oldpi.pd.kl(pi.pd)

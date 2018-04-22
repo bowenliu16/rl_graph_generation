@@ -81,7 +81,7 @@ class MoleculeEnv(gym.Env):
         self.qed_ratio = qed_ratio
         self.sa_ratio = sa_ratio
         self.reward_step_total = reward_step_total
-        self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3])
+        self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3, 2])
         self.observation_space = {}
         self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
         self.observation_space['node'] = gym.Space(shape=[1, self.max_atom, len(possible_atoms)])
@@ -115,12 +115,16 @@ class MoleculeEnv(gym.Env):
         total_atoms = self.mol.GetNumAtoms()
 
         ### take action
-        if action[0, 1] >= total_atoms:
-            self._add_atom(action[0, 1] - total_atoms)  # add new node
-            action[0, 1] = total_atoms  # new node id
-            self._add_bond(action)  # add new edge
-        else:
-            self._add_bond(action)  # add new edge
+        if action[0,3]==0: # not stop
+            stop = False
+            if action[0, 1] >= total_atoms:
+                self._add_atom(action[0, 1] - total_atoms)  # add new node
+                action[0, 1] = total_atoms  # new node id
+                self._add_bond(action)  # add new edge
+            else:
+                self._add_bond(action)  # add new edge
+        else: # stop
+            stop = True
 
         ### calculate intermediate rewards
         if self.check_valency():
@@ -134,7 +138,7 @@ class MoleculeEnv(gym.Env):
 
         ### calculate terminal rewards
         # todo: add terminal action
-        if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action:
+        if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop:
             # default reward
             reward_valid = 0
             reward_qed = 0
@@ -182,6 +186,7 @@ class MoleculeEnv(gym.Env):
             info['reward'] = reward
             info['flag_steric_strain_filter'] = flag_steric_strain_filter
             info['flag_zinc_molecule_filter'] = flag_zinc_molecule_filter
+            info['stop'] = stop
 
             ## old version
             # # check chemical validity of final molecule (valency, as well as
@@ -466,7 +471,7 @@ class MoleculeEnv(gym.Env):
         ob['node'] = np.zeros((batch_size, 1, self.max_atom, atom_type_num))
         ob['adj'] = np.zeros((batch_size, bond_type_num, self.max_atom, self.max_atom))
 
-        ac = np.zeros((batch_size, 3))
+        ac = np.zeros((batch_size, 4))
         ### select molecule
         dataset_len = len(self.dataset)
         np.random.randint(0,dataset_len,size=batch_size)
@@ -476,36 +481,42 @@ class MoleculeEnv(gym.Env):
             Chem.SanitizeMol(mol,sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
             graph = mol_to_nx(mol)
             edges = graph.edges()
+            # select the edge num for the subgraph
             edges_sub_len = random.randint(1,len(edges))
             edges_sub = random.sample(edges,k=edges_sub_len)
             graph_sub = nx.Graph(edges_sub)
             graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)
-            ### random pick an edge from the subgraph, then remove it
-            edge_sample = random.sample(graph_sub.edges(),k=1)
-            graph_sub.remove_edges_from(edge_sample)
-            graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)
-            edge_sample = edge_sample[0] # get value
-            ### get action
-            graph_sub_nodes = graph_sub.nodes()
-            if edge_sample[0] in graph_sub_nodes and edge_sample[1] in graph_sub_nodes:
-                node1 = graph_sub_nodes.index(edge_sample[0])
-                node2 = graph_sub_nodes.index(edge_sample[1])
-            elif edge_sample[0] in graph_sub_nodes:
-                node1 = graph_sub_nodes.index(edge_sample[0])
-                node2 = np.argmax(
-                    graph.node[edge_sample[1]]['symbol'] == self.possible_atom_types) + graph_sub.number_of_nodes()
-            elif edge_sample[1] in graph_sub_nodes:
-                node1 = graph_sub_nodes.index(edge_sample[1])
-                node2 = np.argmax(
-                    graph.node[edge_sample[0]]['symbol'] == self.possible_atom_types) + graph_sub.number_of_nodes()
+            if edges_sub_len==len(edges): # when the subgraph the whole molecule, the expert show stop sign
+                node1 = random.randint(0,mol.GetNumAtoms()-1)
+                node2 = random.randint(0,mol.GetNumAtoms()+atom_type_num-1)
+                edge_type = random.randint(0,bond_type_num-1)
+                ac[i,:] = [node1,node2,edge_type,1] # stop
             else:
-                print('Expert policy error!')
-            edge_type = np.argmax(graph[edge_sample[0]][edge_sample[1]]['bond_type'] == self.possible_bond_types)
-            ac[i,:] = [node1,node2,edge_type]
+                ### random pick an edge from the subgraph, then remove it
+                edge_sample = random.sample(graph_sub.edges(),k=1)
+                graph_sub.remove_edges_from(edge_sample)
+                graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)
+                edge_sample = edge_sample[0] # get value
+                ### get action
+                if edge_sample[0] in graph_sub.nodes() and edge_sample[1] in graph_sub.nodes():
+                    node1 = graph_sub.nodes().index(edge_sample[0])
+                    node2 = graph_sub.nodes().index(edge_sample[1])
+                elif edge_sample[0] in graph_sub.nodes():
+                    node1 = graph_sub.nodes().index(edge_sample[0])
+                    node2 = np.argmax(
+                        graph.node[edge_sample[1]]['symbol'] == self.possible_atom_types) + graph_sub.number_of_nodes()
+                elif edge_sample[1] in graph_sub.nodes():
+                    node1 = graph_sub.nodes().index(edge_sample[1])
+                    node2 = np.argmax(
+                        graph.node[edge_sample[0]]['symbol'] == self.possible_atom_types) + graph_sub.number_of_nodes()
+                else:
+                    print('Expert policy error!')
+                edge_type = np.argmax(graph[edge_sample[0]][edge_sample[1]]['bond_type'] == self.possible_bond_types)
+                ac[i,:] = [node1,node2,edge_type,0] # don't stop
 
             ### get observation
             n = graph_sub.number_of_nodes()
-            for node_id, node in enumerate(graph_sub_nodes):
+            for node_id, node in enumerate(graph_sub.nodes()):
                 float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
                 assert float_array.sum() != 0
                 ob['node'][i, 0, node_id, :] = float_array

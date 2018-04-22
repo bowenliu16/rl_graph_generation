@@ -93,7 +93,7 @@ class GCNPolicy(object):
         ob = {'adj': U.get_placeholder(name="adj", dtype=tf.float32, shape=[None,ob_space['adj'].shape[0],None,None]),
               'node': U.get_placeholder(name="node", dtype=tf.float32, shape=[None,1,None,ob_space['node'].shape[2]])}
         # only when evaluating given action, at training time
-        self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,3]) # feed groudtruth action
+        self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,4]) # feed groudtruth action
         if kind == 'small':
             ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
             self.emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1')
@@ -109,12 +109,15 @@ class GCNPolicy(object):
         logits_mask = tf.sequence_mask(ob_len, maxlen=tf.shape(ob['node'])[2]) # mask all valid entry
         logits_first_mask = tf.sequence_mask(ob_len_first,maxlen=tf.shape(ob['node'])[2]) # mask valid entry -3 (rm isolated nodes)
 
-        ### 2 get graph embedding
-        emb_graph = tf.reduce_max(emb_node, axis=1)  # max pooling
+        ### 2 predict stop
+        self.logits_stop = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1')
+        self.logits_stop = tf.reduce_sum(tf.layers.dense(self.logits_stop, 2, activation=None, name='linear_stop2'),axis=1)  # B*2
+        pd_stop = CategoricalPdType(-1).pdfromflat(flat=self.logits_stop)
+        ac_stop = pd_stop.sample()
 
         ### 3.1: select first (active) node
         # rules: only select effective nodes
-        self.logits_first = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_select1') # todo: do not select isolated nodes!!
+        self.logits_first = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_select1')
         self.logits_first = tf.squeeze(tf.layers.dense(self.logits_first, 1, activation=None, name='linear_select2'),axis=-1) # B*n
         logits_first_null = tf.ones(tf.shape(self.logits_first))*-100
         self.logits_first = tf.where(condition=logits_first_mask,x=self.logits_first,y=logits_first_null)
@@ -196,7 +199,7 @@ class GCNPolicy(object):
 
 
         # ncat_list = [tf.shape(logits_first),ob_space['adj'].shape[-1],ob_space['adj'].shape[0]]
-        self.pd = self.pdtype(-1).pdfromflat([self.logits_first,self.logits_second_real,self.logits_edge_real])
+        self.pd = self.pdtype(-1).pdfromflat([self.logits_first,self.logits_second_real,self.logits_edge_real,self.logits_stop])
         self.vpred = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='value1')
         self.vpred = tf.layers.dense(self.vpred, 1, activation=None, name='value2')
         self.vpred = tf.reduce_max(self.vpred,axis=1)
@@ -204,7 +207,7 @@ class GCNPolicy(object):
         self.state_in = []
         self.state_out = []
 
-        self.ac = tf.concat((tf.expand_dims(ac_first,axis=1),tf.expand_dims(ac_second,axis=1),tf.expand_dims(ac_edge,axis=1)),axis=1)
+        self.ac = tf.concat((tf.expand_dims(ac_first,axis=1),tf.expand_dims(ac_second,axis=1),tf.expand_dims(ac_edge,axis=1),tf.expand_dims(ac_stop,axis=1)),axis=1)
 
         print('ob_adj', ob['adj'].get_shape(),
               'ob_node', ob['node'].get_shape())
