@@ -488,7 +488,10 @@ class MoleculeEnv(gym.Env):
             graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)
             if edges_sub_len==len(edges): # when the subgraph the whole molecule, the expert show stop sign
                 node1 = random.randint(0,mol.GetNumAtoms()-1)
-                node2 = random.randint(0,mol.GetNumAtoms()+atom_type_num-1)
+                while True:
+                    node2 = random.randint(0,mol.GetNumAtoms()+atom_type_num-1)
+                    if node2!=node1:
+                        break
                 edge_type = random.randint(0,bond_type_num-1)
                 ac[i,:] = [node1,node2,edge_type,1] # stop
             else:

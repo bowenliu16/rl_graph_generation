@@ -119,7 +119,7 @@ class GCNPolicy(object):
         # rules: only select effective nodes
         self.logits_first = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_select1')
         self.logits_first = tf.squeeze(tf.layers.dense(self.logits_first, 1, activation=None, name='linear_select2'),axis=-1) # B*n
-        logits_first_null = tf.ones(tf.shape(self.logits_first))*-100
+        logits_first_null = tf.ones(tf.shape(self.logits_first))*-1000
         self.logits_first = tf.where(condition=logits_first_mask,x=self.logits_first,y=logits_first_null)
         # using own prediction
         pd_first = CategoricalPdType(-1).pdfromflat(flat=self.logits_first)
@@ -147,7 +147,7 @@ class GCNPolicy(object):
         self.logits_second = tf.squeeze(self.logits_second, axis=-1)
         ac_first_mask = tf.one_hot(ac_first, depth=tf.shape(emb_node)[1], dtype=tf.bool, on_value=False, off_value=True)
         logits_second_mask = tf.logical_and(logits_mask,ac_first_mask)
-        logits_second_null = tf.ones(tf.shape(self.logits_second)) * -100
+        logits_second_null = tf.ones(tf.shape(self.logits_second)) * -1000
         self.logits_second = tf.where(condition=logits_second_mask, x=self.logits_second, y=logits_second_null)
 
         pd_second = CategoricalPdType(-1).pdfromflat(flat=self.logits_second)
