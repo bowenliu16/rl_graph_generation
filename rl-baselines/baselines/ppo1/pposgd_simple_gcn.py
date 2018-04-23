@@ -203,7 +203,7 @@ def learn(args,env, policy_fn, *,
     ## loss update function
     lossandgrad_ppo = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list_pi)])
     lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi)])
-    lossandgrad_discriminator = U.function([ob['adj'],ob['node'],ob_gen['adj'],ob_gen['node']], [loss_discriminator, U.flatgrad(loss_expert, var_list_d)])
+    lossandgrad_discriminator = U.function([ob['adj'],ob['node'],ob_gen['adj'],ob_gen['node']], [loss_discriminator, U.flatgrad(loss_discriminator, var_list_d)])
     loss_discriminator_gen_func = U.function([ob_gen['adj'],ob_gen['node']], loss_discriminator_gen)
 
 
