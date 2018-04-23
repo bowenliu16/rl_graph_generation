@@ -5,7 +5,7 @@ import itertools
 import numpy as np
 from rdkit import Chem  # TODO(Bowen): remove and just use AllChem
 from rdkit.Chem import AllChem
-from rdkit.Chem.Descriptors import qed
+from rdkit.Chem.Descriptors import qed, MolLogP
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.FilterCatalog import FilterCatalogParams, FilterCatalog
 # import gym_molecule
@@ -811,7 +811,7 @@ def reward_target_log_p(mol, target):
     :param target: float
     :return: float (-inf, 1]
     """
-    x = Chem.Crippen.MolLogP(mol)
+    x = MolLogP(mol)
     reward = -1 * (x - target)**2 + 1
     return reward
 
@@ -859,6 +859,108 @@ def reward_target_molecule_similarity(mol, target, radius=2, nBits=2048,
                                                         useChirality=useChirality)
     return DataStructs.TanimotoSimilarity(x, target)
 
+
+### TERMINAL VALUE REWARDS ###
+
+def reward_penalized_log_p(mol):
+    """
+    Reward that consists of log p penalized by SA and # long cycles,
+    as described in (Kusner et al. 2017). Scores are normalized based on the
+    statistics of 250k_rndm_zinc_drugs_clean.smi dataset
+    :param mol: rdkit mol object
+    :return: float
+    """
+    # normalization constants, statistics from 250k_rndm_zinc_drugs_clean.smi
+    logP_mean = 2.4570953396190123
+    logP_std = 1.434324401111988
+    SA_mean = -3.0525811293166134
+    SA_std = 0.8335207024513095
+    cycle_mean = -0.0485696876403053
+    cycle_std = 0.2860212110245455
+
+    log_p = MolLogP(mol)
+    SA = -calculateScore(mol)
+
+    # cycle score
+    cycle_list = nx.cycle_basis(nx.Graph(
+        Chem.rdmolops.GetAdjacencyMatrix(mol)))
+    if len(cycle_list) == 0:
+        cycle_length = 0
+    else:
+        cycle_length = max([len(j) for j in cycle_list])
+    if cycle_length <= 6:
+        cycle_length = 0
+    else:
+        cycle_length = cycle_length - 6
+    cycle_score = -cycle_length
+
+    normalized_log_p = (log_p - logP_mean) / logP_std
+    normalized_SA = (SA - SA_mean) / SA_std
+    normalized_cycle = (cycle_score - cycle_mean) / cycle_std
+
+    return normalized_log_p + normalized_SA + normalized_cycle
+
+# # TEST compare with junction tree paper examples from Figure 7
+# assert round(reward_penalized_log_p(Chem.MolFromSmiles('ClC1=CC=C2C(C=C(C('
+#                                                        'C)=O)C(C(NC3=CC(NC('
+#                                                        'NC4=CC(C5=C('
+#                                                        'C)C=CC=C5)=CC=C4)=O)=CC=C3)=O)=C2)=C1')), 2) == 5.30
+# assert round(reward_penalized_log_p(Chem.MolFromSmiles('CC(NC1=CC(C2=CC=CC('
+#                                                        'NC(NC3=CC=CC(C4=CC('
+#                                                        'F)=CC=C4)=C3)=O)=C2)=CC=C1)=O')), 2) == 4.49
+# assert round(reward_penalized_log_p(Chem.MolFromSmiles('ClC(C('
+#                                                        'Cl)=C1)=CC=C1NC2=CC=CC=C2C(NC(NC3=C(C(NC4=C(Cl)C=CC=C4)=S)C=CC=C3)=O)=O')), 2) == 4.93
+
+# def get_normalized_values():
+#     fname = '/home/bowen/pycharm_deployment_directory/rl_graph_generation/gym-molecule/gym_molecule/dataset/250k_rndm_zinc_drugs_clean.smi'
+#     with open(fname) as f:
+#         smiles = f.readlines()
+#
+#     for i in range(len(smiles)):
+#         smiles[i] = smiles[i].strip()
+#     smiles_rdkit = []
+#
+#     for i in range(len(smiles)):
+#         smiles_rdkit.append(Chem.MolToSmiles(Chem.MolFromSmiles(smiles[i])))
+#     print(i)
+#
+#     logP_values = []
+#     for i in range(len(smiles)):
+#         logP_values.append(MolLogP(Chem.MolFromSmiles(smiles_rdkit[i])))
+#     print(i)
+#
+#     SA_scores = []
+#     for i in range(len(smiles)):
+#         SA_scores.append(
+#             -calculateScore(Chem.MolFromSmiles(smiles_rdkit[i])))
+#     print(i)
+#
+#     cycle_scores = []
+#     for i in range(len(smiles)):
+#         cycle_list = nx.cycle_basis(nx.Graph(
+#             Chem.rdmolops.GetAdjacencyMatrix(Chem.MolFromSmiles(smiles_rdkit[
+#                                                                   i]))))
+#         if len(cycle_list) == 0:
+#             cycle_length = 0
+#         else:
+#             cycle_length = max([len(j) for j in cycle_list])
+#         if cycle_length <= 6:
+#             cycle_length = 0
+#         else:
+#             cycle_length = cycle_length - 6
+#         cycle_scores.append(-cycle_length)
+#     print(i)
+#
+#     SA_scores_normalized = (np.array(SA_scores) - np.mean(SA_scores)) / np.std(
+#         SA_scores)
+#     logP_values_normalized = (np.array(logP_values) - np.mean(
+#         logP_values)) / np.std(logP_values)
+#     cycle_scores_normalized = (np.array(cycle_scores) - np.mean(
+#         cycle_scores)) / np.std(cycle_scores)
+#
+#     return np.mean(SA_scores), np.std(SA_scores), np.mean(
+#         logP_values), np.std(logP_values), np.mean(
+#         cycle_scores), np.std(cycle_scores)
 
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
