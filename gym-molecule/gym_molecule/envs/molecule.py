@@ -61,6 +61,7 @@ class MoleculeEnv(gym.Env):
         '''
 
         self.mol = Chem.RWMol()
+        self.smile_list = []
         if data_type=='gdb':
             possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
         elif data_type=='zinc':
@@ -135,6 +136,7 @@ class MoleculeEnv(gym.Env):
         else:
             reward_step = -self.reward_step_total/self.max_atom  # invalid action
             self.mol = self.mol_old
+        self.smile_list.append(self.get_final_smiles())
 
         ### calculate terminal rewards
         # todo: add terminal action
@@ -255,6 +257,7 @@ class MoleculeEnv(gym.Env):
         self.mol = Chem.RWMol()
         # self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
         self._add_atom(0) # always add carbon first
+        self.smile_list= [self.get_final_smiles()]
         self.counter = 0
         ob = self.get_observation()
         return ob
@@ -291,6 +294,8 @@ class MoleculeEnv(gym.Env):
             return False
         else:
             self.mol.AddBond(int(action[0,0]), int(action[0,1]), order=bond_type)
+            # bond = self.mol.GetBondBetweenAtoms(int(action[0, 0]), int(action[0, 1]))
+            # bond.SetIntProp('ordering',self.mol.GetNumBonds())
             return True
 
     def _modify_bond(self, action):

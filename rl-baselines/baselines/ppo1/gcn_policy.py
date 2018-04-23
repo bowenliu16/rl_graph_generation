@@ -118,6 +118,7 @@ class GCNPolicy(object):
         if kind == 'small':
             ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
             self.emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1')
+            self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, 32, name='gcn1_1')
             self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, 32, is_act=False, is_normalize=True, name='gcn2')
             emb_node = tf.squeeze(self.emb_node2,axis=1)  # B*n*f
         else:
