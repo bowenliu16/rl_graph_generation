@@ -10,7 +10,7 @@ from collections import deque
 from tensorboardX import SummaryWriter
 from baselines.ppo1.gcn_policy import discriminator,discriminator_net
 
-def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func):
+def traj_segment_generator(args, pi, env, horizon, stochastic,d_step,d_final):
     t = 0
     ac = env.action_space.sample() # not used, just so we have the datatype
     new = True # marks if we're on first timestep of an episode
@@ -28,6 +28,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
     ob_adjs = np.array([ob_adj for _ in range(horizon)])
     ob_nodes = np.array([ob_node for _ in range(horizon)])
     rews = np.zeros(horizon, 'float32')
+    rews_d_step = np.zeros(horizon, 'float32')
     vpreds = np.zeros(horizon, 'float32')
     news = np.zeros(horizon, 'int32')
     acs = np.array([ac for _ in range(horizon)])
@@ -52,11 +53,13 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
         if t > 0 and t % horizon == 0:
             yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes, "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens}
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens,"rews_final":rews_final, "rews_d_final":rews_d_final, "rews_d_step"}
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
+            rews_final = []
+            rews_d_final = []
         i = t % horizon
         # obs[i] = ob
         ob_adjs[i] = ob['adj']
@@ -67,9 +70,13 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
         prevacs[i] = prevac
 
         ob, rew, new, info = env.step(ac)
+        rew_d_final = 0
+        if new:
+            # add final discriminator reward
+            rew_d_final = 1-d_final(ob['adj'][np.newaxis,:,:,:],ob['node'][np.newaxis,:,:,:])[0]# make it positive
         # add stepwise discriminator reward
-        rew_d = -args.gan_ratio*discriminator_func(ob['adj'][np.newaxis,:,:,:],ob['node'][np.newaxis,:,:,:])[0]/env.max_atom
-        rew += rew_d
+        rew_d_step = args.gan_step_ratio*(1-d_step(ob['adj'][np.newaxis,:,:,:],ob['node'][np.newaxis,:,:,:])[0])/env.max_atom # make it positive
+        rew += rew_d_final+rew_d_step
         rews[i] = rew
 
         cur_ep_ret += rew
@@ -80,11 +87,34 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
                 f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],rew_d,rew,info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
+            rews_final.append(rew)
+            rews_d_final.append(rew_d_final)
             cur_ep_ret = 0
             cur_ep_len = 0
             ob = env.reset()
 
         t += 1
+
+def final_ob_generator(args, pi, env, batch_size, stochastic):
+    t = 0
+    ob = env.reset()
+    ob_adj = ob['adj']
+    ob_node = ob['node']
+    # Initialize history arrays
+    ob_adjs = np.array([ob_adj for _ in range(batch_size)])
+    ob_nodes = np.array([ob_node for _ in range(batch_size)])
+
+    while True:
+        ac, vpred, debug = pi.act(stochastic, ob)
+        if t > 0 and t % batch_size == 0:
+            yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes}
+        ob, rew, new, info = env.step(ac)
+        if new:
+            i = t % batch_size
+            ob_adjs[i] = ob['adj']
+            ob_nodes[i] = ob['node']
+            ob = env.reset()
+            t += 1
 
 def add_vtarg_and_adv(seg, gamma, lam):
     """
@@ -166,11 +196,14 @@ def learn(args,env, policy_fn, *,
     loss_expert = -tf.reduce_mean(pi_logp)
 
     ## Discriminator loss
-    loss_discriminator,_,_ = discriminator(ob,ob_gen,name='d_net')
-    loss_discriminator_gen = discriminator_net(ob_gen,name='d_net')
+    loss_d_step, _, _ = discriminator(ob, ob_gen, name='d_step')
+    loss_d_step_gen = discriminator_net(ob_gen, name='d_step')
+    loss_d_final, _, _ = discriminator(ob, ob_gen, name='d_final')
+    loss_d_final_gen = discriminator_net(ob_gen, name='d_final')
 
     var_list_pi = pi.get_trainable_variables()
-    var_list_d = [var for var in tf.global_variables() if 'd_net' in var.name]
+    var_list_d_step = [var for var in tf.global_variables() if 'd_step' in var.name]
+    var_list_d_final = [var for var in tf.global_variables() if 'd_final' in var.name]
 
     ## debug
     debug={}
@@ -203,13 +236,17 @@ def learn(args,env, policy_fn, *,
     ## loss update function
     lossandgrad_ppo = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list_pi)])
     lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi)])
-    lossandgrad_discriminator = U.function([ob['adj'],ob['node'],ob_gen['adj'],ob_gen['node']], [loss_discriminator, U.flatgrad(loss_discriminator, var_list_d)])
-    loss_discriminator_gen_func = U.function([ob_gen['adj'],ob_gen['node']], loss_discriminator_gen)
+    lossandgrad_d_step = U.function([ob['adj'], ob['node'], ob_gen['adj'], ob_gen['node']], [loss_d_step, U.flatgrad(loss_d_step, var_list_d_step)])
+    lossandgrad_d_final = U.function([ob['adj'], ob['node'], ob_gen['adj'], ob_gen['node']], [loss_d_final, U.flatgrad(loss_d_final, var_list_d_final)])
+    loss_d_step_gen = U.function([ob_gen['adj'], ob_gen['node']], loss_d_step_gen)
+    loss_d_final_gen = U.function([ob_gen['adj'], ob_gen['node']], loss_d_final_gen)
+
 
 
 
     adam_pi = MpiAdam(var_list_pi, epsilon=adam_epsilon)
-    adam_discriminator = MpiAdam(var_list_d, epsilon=adam_epsilon)
+    adam_d_step = MpiAdam(var_list_d_step, epsilon=adam_epsilon)
+    adam_d_final = MpiAdam(var_list_d_final, epsilon=adam_epsilon)
 
     assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
         for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
@@ -220,7 +257,8 @@ def learn(args,env, policy_fn, *,
 
     U.initialize()
     adam_pi.sync()
-    adam_discriminator.sync()
+    adam_d_step.sync()
+    adam_d_final.sync()
 
 
     # Prepare for rollouts
@@ -232,7 +270,8 @@ def learn(args,env, policy_fn, *,
     lenbuffer = deque(maxlen=100) # rolling buffer for episode lengths
     rewbuffer = deque(maxlen=100) # rolling buffer for episode rewards
 
-    seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True,loss_discriminator_gen_func)
+    seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_step_gen,loss_d_final_gen)
+    final_ob_gen = final_ob_generator(args,pi,env,optim_batchsize,True)
 
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
@@ -266,13 +305,13 @@ def learn(args,env, policy_fn, *,
         g_expert=0
         if args.has_expert==1:
             ## Expert train
-            losses = []  # list of tuples, each of which gives the loss for a minibatch
+            losses_expert = []  # list of tuples, each of which gives the loss for a minibatch
             for _ in range(optim_epochs*2):
                 ob_expert, ac_expert = env.get_expert(optim_batchsize)
-                losses_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
+                loss_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
                 adam_pi.update(g_expert, optim_stepsize * cur_lrmult)
-                losses.append(losses_expert)
-            loss_expert = np.mean(losses, axis=0, keepdims=True)
+                losses_expert.append(loss_expert)
+            loss_expert = np.mean(losses_expert, axis=0, keepdims=True)
             # logger.log(fmt_row(13, loss_expert))
 
 
@@ -288,9 +327,11 @@ def learn(args,env, policy_fn, *,
         optim_batchsize = optim_batchsize or ob_adj.shape[0]
 
 
-        loss_discriminator=0
+        loss_d_step=0
+        loss_d_final=0
         g_ppo=0
-        g_discriminator=0
+        g_d_step=0
+        g_d_final=0
         if args.has_rl==1:
             ## PPO train
             assign_old_eq_new() # set old parameter values to new parameter values
@@ -299,18 +340,27 @@ def learn(args,env, policy_fn, *,
             # Here we do a bunch of optimization epochs over the data
             for _ in range(optim_epochs):
                 losses_ppo = [] # list of tuples, each of which gives the loss for a minibatch
-                losses_d = []
+                losses_d_step = []
+                losses_d_final = []
                 for batch in d.iterate_once(optim_batchsize):
                     # ppo
                     *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                     adam_pi.update(g_ppo, optim_stepsize * cur_lrmult)
                     losses_ppo.append(newlosses)
-                    # update discriminator
+                    # update step discriminator
                     ob_expert, _ = env.get_expert(optim_batchsize)
-                    losses_discriminator, g_discriminator = lossandgrad_discriminator(ob_expert["adj"],ob_expert["node"],batch["ob_adj"], batch["ob_node"])
-                    adam_discriminator.update(g_discriminator, optim_stepsize * cur_lrmult)
-                    losses_d.append(losses_discriminator)
-                loss_discriminator = np.mean(losses_d, axis=0, keepdims=True)
+                    loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
+                    adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
+                    losses_d_step.append(loss_d_step)
+                    # update final discriminator
+                    ob_expert, _ = env.get_expert(optim_batchsize,is_final=True)
+                    seg_final = final_ob_gen.__next__()
+                    loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg_final["ob_adj"],
+                                                               seg_final["ob_node"])
+                    adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
+                    losses_d_final.append(loss_d_final)
+                loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)
+                loss_d_final = np.mean(losses_d_final, axis=0, keepdims=True)
                 # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
 
@@ -334,16 +384,20 @@ def learn(args,env, policy_fn, *,
 
         if writer is not None:
             writer.add_scalar("loss_expert", loss_expert, iters_so_far)
-            writer.add_scalar("loss_discriminator", loss_discriminator, iters_so_far)
-            writer.add_scalar('grad_expert_min', np.amin(g_expert), iters_so_far)
-            writer.add_scalar('grad_expert_max', np.amax(g_expert), iters_so_far)
-            writer.add_scalar('grad_expert_norm', np.linalg.norm(g_expert), iters_so_far)
-            writer.add_scalar('grad_rl_min', np.amin(g_ppo), iters_so_far)
-            writer.add_scalar('grad_rl_max', np.amax(g_ppo), iters_so_far)
-            writer.add_scalar('grad_rl_norm', np.linalg.norm(g_ppo), iters_so_far)
-            writer.add_scalar('grad_discriminator_min', np.amin(g_discriminator), iters_so_far)
-            writer.add_scalar('grad_discriminator_max', np.amax(g_discriminator), iters_so_far)
-            writer.add_scalar('grad_discriminator_norm', np.linalg.norm(g_discriminator), iters_so_far)
+            writer.add_scalar("loss_d_step", loss_d_step, iters_so_far)
+            writer.add_scalar("loss_d_final", loss_d_final, iters_so_far)
+            writer.add_scalar('g_expert_min', np.amin(g_expert), iters_so_far)
+            writer.add_scalar('g_expert_max', np.amax(g_expert), iters_so_far)
+            writer.add_scalar('g_expert_norm', np.linalg.norm(g_expert), iters_so_far)
+            writer.add_scalar('g_rl_min', np.amin(g_ppo), iters_so_far)
+            writer.add_scalar('g_rl_max', np.amax(g_ppo), iters_so_far)
+            writer.add_scalar('g_rl_norm', np.linalg.norm(g_ppo), iters_so_far)
+            writer.add_scalar('g_d_step_min', np.amin(g_d_step), iters_so_far)
+            writer.add_scalar('g_d_step_max', np.amax(g_d_step), iters_so_far)
+            writer.add_scalar('g_d_step_norm', np.linalg.norm(g_d_step), iters_so_far)
+            writer.add_scalar('g_d_final_min', np.amin(g_d_final), iters_so_far)
+            writer.add_scalar('g_d_final_max', np.amax(g_d_final), iters_so_far)
+            writer.add_scalar('g_d_final_norm', np.linalg.norm(g_d_final), iters_so_far)
             writer.add_scalar('learning_rate', optim_stepsize * cur_lrmult, iters_so_far)
 
         for (lossval, name) in zipsame(meanlosses, loss_names):

@@ -55,7 +55,7 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         pass
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1):
+    def init(self, data_type='zinc', logp_ratio=1, qed_ratio=1, sa_ratio=1, step_ratio=1):
         '''
         own init function, since gym does not support passing argument
         '''
@@ -81,7 +81,7 @@ class MoleculeEnv(gym.Env):
         self.logp_ratio = logp_ratio
         self.qed_ratio = qed_ratio
         self.sa_ratio = sa_ratio
-        self.reward_step_total = reward_step_total
+        self.step_ratio = step_ratio
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3, 2])
         self.observation_space = {}
         self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
@@ -130,11 +130,11 @@ class MoleculeEnv(gym.Env):
         ### calculate intermediate rewards
         if self.check_valency():
             if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
-                reward_step = self.reward_step_total/self.max_atom # successfully add node/edge
+                reward_step = self.step_ratio / self.max_atom # successfully add node/edge
             else:
-                reward_step = -self.reward_step_total/self.max_atom # edge exist
+                reward_step = -self.step_ratio / self.max_atom # edge exist
         else:
-            reward_step = -self.reward_step_total/self.max_atom  # invalid action
+            reward_step = -self.step_ratio / self.max_atom  # invalid action
             self.mol = self.mol_old
         self.smile_list.append(self.get_final_smiles())
 
@@ -469,7 +469,7 @@ class MoleculeEnv(gym.Env):
         return ob
 
 
-    def get_expert(self, batch_size):
+    def get_expert(self,batch_size,is_final=False):
         ob = {}
         atom_type_num = len(self.possible_atom_types)
         bond_type_num = len(self.possible_bond_types)
@@ -487,7 +487,10 @@ class MoleculeEnv(gym.Env):
             graph = mol_to_nx(mol)
             edges = graph.edges()
             # select the edge num for the subgraph
-            edges_sub_len = random.randint(1,len(edges))
+            if is_final:
+                edges_sub_len = len(edges)
+            else:
+                edges_sub_len = random.randint(1,len(edges))
             edges_sub = random.sample(edges,k=edges_sub_len)
             graph_sub = nx.Graph(edges_sub)
             graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)
