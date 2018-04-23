@@ -538,6 +538,7 @@ class MoleculeEnv(gym.Env):
 
         return ob,ac
 
+
 ### YES/NO filters ###
 def zinc_molecule_filter(mol):
     """

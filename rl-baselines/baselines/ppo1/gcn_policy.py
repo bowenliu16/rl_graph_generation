@@ -80,6 +80,27 @@ def emb_node(ob_node,out_channels):
     return ob_node @ tf.tile(emb,[batch_size,1,1,1])
 
 
+def discriminator_net(ob, name='d_net'):
+    with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
+        ob_node = tf.layers.dense(ob['node'], 8, activation=None, use_bias=False, name='emb')  # embedding layer
+        emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1')
+        emb_node2 = GCN_batch(ob['adj'], emb_node1, 32, is_act=False, is_normalize=True, name='gcn2')
+        emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
+        pred = tf.layers.dense(emb_graph, 1, activation=tf.nn.sigmoid, name='linear1')
+        return pred
+
+def discriminator(x,x_gen,name='d_net'):
+    d = discriminator_net(x, name=name)
+    d_ = discriminator_net(x_gen,name=name)
+
+    d = tf.reduce_mean(d)
+    d_ = tf.reduce_mean(d_)
+    d_loss = d - d_
+    # todo: try adding d_grad_loss
+
+    return d_loss, d, d_
+
+
 class GCNPolicy(object):
     recurrent = False
     def __init__(self, name, ob_space, ac_space, kind='small', atom_type_num = None):
@@ -110,8 +131,8 @@ class GCNPolicy(object):
         logits_first_mask = tf.sequence_mask(ob_len_first,maxlen=tf.shape(ob['node'])[2]) # mask valid entry -3 (rm isolated nodes)
 
         ### 2 predict stop
-        self.logits_stop = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1')
-        self.logits_stop = tf.reduce_sum(tf.layers.dense(self.logits_stop, 2, activation=None, name='linear_stop2'),axis=1)  # B*2
+        self.logits_stop = tf.reduce_sum(tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1'),axis=1)
+        self.logits_stop = tf.layers.dense(self.logits_stop, 2, activation=None, name='linear_stop2')  # B*2
         pd_stop = CategoricalPdType(-1).pdfromflat(flat=self.logits_stop)
         ac_stop = pd_stop.sample()
 

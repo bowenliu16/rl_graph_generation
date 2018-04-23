@@ -8,8 +8,9 @@ from baselines.common.mpi_moments import mpi_moments
 from mpi4py import MPI
 from collections import deque
 from tensorboardX import SummaryWriter
+from baselines.ppo1.gcn_policy import discriminator,discriminator_net
 
-def traj_segment_generator(args, pi, env, horizon, stochastic):
+def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func):
     t = 0
     ac = env.action_space.sample() # not used, just so we have the datatype
     new = True # marks if we're on first timestep of an episode
@@ -66,14 +67,17 @@ def traj_segment_generator(args, pi, env, horizon, stochastic):
         prevacs[i] = prevac
 
         ob, rew, new, info = env.step(ac)
+        # add discriminator reward
+        rew_d = -1*discriminator_func(ob['adj'][np.newaxis,:,:,:],ob['node'][np.newaxis,:,:,:])
+        rew += rew_d
         rews[i] = rew
 
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
             with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
-                str = ''.join(['{},']*len(info))[:-1]+'\n'
-                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],info['reward'],info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
+                str = ''.join(['{},']*(len(info)+1))[:-1]+'\n'
+                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],rew_d,rew,info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             cur_ep_ret = 0
@@ -130,6 +134,10 @@ def learn(args,env, policy_fn, *,
     ob['adj'] = U.get_placeholder_cached(name="adj")
     ob['node'] = U.get_placeholder_cached(name="node")
 
+    ob_gen = {}
+    ob_gen['adj'] = U.get_placeholder(shape=[None,ob_space['adj'].shape[0],None,None],dtype=tf.float32,name='adj_gen')
+    ob_gen['node'] = U.get_placeholder(shape=[None,1,None,ob_space['node'].shape[2]],dtype=tf.float32,name='node_gen')
+
     # ac = pi.pdtype.sample_placeholder([None])
     # ac = tf.placeholder(dtype=tf.int64,shape=env.action_space.nvec.shape)
     ac = tf.placeholder(dtype=tf.int64, shape=[None,4],name='ac_real')
@@ -157,8 +165,12 @@ def learn(args,env, policy_fn, *,
     ## Expert loss
     loss_expert = -tf.reduce_mean(pi_logp)
 
-    var_list = pi.get_trainable_variables()
-    var_list_all = pi.get_variables()
+    ## Discriminator loss
+    loss_discriminator,_,_ = discriminator(ob,ob_gen,name='d_net')
+    loss_discriminator_gen = discriminator_net(ob_gen,name='d_net')
+
+    var_list_pi = pi.get_trainable_variables()
+    var_list_d = [var for var in tf.global_variables() if 'd_net' in var.name]
 
     ## debug
     debug={}
@@ -189,20 +201,27 @@ def learn(args,env, policy_fn, *,
 
 
     ## loss update function
-    lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list)])
-    lossandgrad = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list)])
+    lossandgrad_ppo = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list_pi)])
+    lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi)])
+    lossandgrad_discriminator = U.function([ob['adj'],ob['node'],ob_gen['adj'],ob_gen['node']], [loss_discriminator, U.flatgrad(loss_expert, var_list_d)])
+    loss_discriminator_gen_func = U.function([ob_gen['adj'],ob_gen['node']], loss_discriminator_gen)
 
-    adam = MpiAdam(var_list, epsilon=adam_epsilon)
+
+
+    adam_pi = MpiAdam(var_list_pi, epsilon=adam_epsilon)
+    adam_discriminator = MpiAdam(var_list_d, epsilon=adam_epsilon)
 
     assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
         for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
-
-    compute_losses_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real],
-                                    loss_expert)
+    #
+    # compute_losses_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real],
+    #                                 loss_expert)
     compute_losses = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses)
 
     U.initialize()
-    adam.sync()
+    adam_pi.sync()
+    adam_discriminator.sync()
+
 
     # Prepare for rollouts
     # ----------------------------------------
@@ -213,7 +232,7 @@ def learn(args,env, policy_fn, *,
     lenbuffer = deque(maxlen=100) # rolling buffer for episode lengths
     rewbuffer = deque(maxlen=100) # rolling buffer for episode rewards
 
-    seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, stochastic=True)
+    seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True,loss_discriminator_gen_func)
 
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
@@ -241,6 +260,8 @@ def learn(args,env, policy_fn, *,
         if MPI.COMM_WORLD.Get_rank() == 0:
             with open('molecule_gen/' + args.dataset+'_'+args.name + '.csv', 'a') as f:
                 f.write('***** Iteration {} *****\n'.format(iters_so_far))
+
+        ## Expert
         loss_expert=0
         g_expert=0
         if args.has_expert==1:
@@ -249,7 +270,7 @@ def learn(args,env, policy_fn, *,
             for _ in range(optim_epochs*2):
                 ob_expert, ac_expert = env.get_expert(optim_batchsize)
                 losses_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
-                adam.update(g_expert, optim_stepsize * cur_lrmult)
+                adam_pi.update(g_expert, optim_stepsize * cur_lrmult)
                 losses.append(losses_expert)
             loss_expert = np.mean(losses, axis=0, keepdims=True)
             # logger.log(fmt_row(13, loss_expert))
@@ -266,7 +287,10 @@ def learn(args,env, policy_fn, *,
         d = Dataset(dict(ob_adj=ob_adj, ob_node=ob_node, ac=ac, atarg=atarg, vtarg=tdlamret), shuffle=not pi.recurrent)
         optim_batchsize = optim_batchsize or ob_adj.shape[0]
 
-        g=0
+
+        loss_discriminator=0
+        g_ppo=0
+        g_discriminator=0
         if args.has_rl==1:
             ## PPO train
             assign_old_eq_new() # set old parameter values to new parameter values
@@ -274,13 +298,21 @@ def learn(args,env, policy_fn, *,
             # logger.log(fmt_row(13, loss_names))
             # Here we do a bunch of optimization epochs over the data
             for _ in range(optim_epochs):
-                losses = [] # list of tuples, each of which gives the loss for a minibatch
+                losses_ppo = [] # list of tuples, each of which gives the loss for a minibatch
+                losses_d = []
                 for batch in d.iterate_once(optim_batchsize):
-                    *newlosses, g = lossandgrad(batch["ob_adj"],batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
-                    adam.update(g, optim_stepsize * cur_lrmult)
-                    losses.append(newlosses)
-                temp = np.mean(losses, axis=0)
+                    # ppo
+                    *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
+                    adam_pi.update(g_ppo, optim_stepsize * cur_lrmult)
+                    losses_ppo.append(newlosses)
+                    # update discriminator
+                    ob_expert, _ = env.get_expert(optim_batchsize)
+                    losses_discriminator, g_discriminator = lossandgrad_discriminator(ob_expert["adj"],ob_expert["node"],batch["ob_adj"], batch["ob_node"])
+                    adam_discriminator.update(g_discriminator, optim_stepsize * cur_lrmult)
+                    losses_d.append(losses_discriminator)
+                loss_discriminator = np.mean(losses_d, axis=0, keepdims=True)
                 # logger.log(fmt_row(13, np.mean(losses, axis=0)))
+
 
         ## PPO val
         # logger.log("Evaluating losses...")
@@ -302,12 +334,16 @@ def learn(args,env, policy_fn, *,
 
         if writer is not None:
             writer.add_scalar("loss_expert", loss_expert, iters_so_far)
+            writer.add_scalar("loss_discriminator", loss_discriminator, iters_so_far)
             writer.add_scalar('grad_expert_min', np.amin(g_expert), iters_so_far)
             writer.add_scalar('grad_expert_max', np.amax(g_expert), iters_so_far)
             writer.add_scalar('grad_expert_norm', np.linalg.norm(g_expert), iters_so_far)
-            writer.add_scalar('grad_rl_min', np.amin(g), iters_so_far)
-            writer.add_scalar('grad_rl_max', np.amax(g), iters_so_far)
-            writer.add_scalar('grad_rl_norm', np.linalg.norm(g), iters_so_far)
+            writer.add_scalar('grad_rl_min', np.amin(g_ppo), iters_so_far)
+            writer.add_scalar('grad_rl_max', np.amax(g_ppo), iters_so_far)
+            writer.add_scalar('grad_rl_norm', np.linalg.norm(g_ppo), iters_so_far)
+            writer.add_scalar('grad_discriminator_min', np.amin(g_discriminator), iters_so_far)
+            writer.add_scalar('grad_discriminator_max', np.amax(g_discriminator), iters_so_far)
+            writer.add_scalar('grad_discriminator_norm', np.linalg.norm(g_discriminator), iters_so_far)
             writer.add_scalar('learning_rate', optim_stepsize * cur_lrmult, iters_so_far)
 
         for (lossval, name) in zipsame(meanlosses, loss_names):
