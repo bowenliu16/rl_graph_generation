@@ -179,7 +179,8 @@ class MoleculeEnv(gym.Env):
                     print('reward error')
 
             new = True # end of episode
-            reward = reward_step + reward_valid + reward_qed + reward_sa + reward_logp
+            # reward = reward_step + reward_valid + reward_qed + reward_sa + reward_logp
+            reward = reward_step + reward_valid + reward_penalized_log_p(self.mol)
             info['smile'] = self.get_final_smiles()
             info['reward_valid'] = reward_valid
             info['reward_qed'] = reward_qed
