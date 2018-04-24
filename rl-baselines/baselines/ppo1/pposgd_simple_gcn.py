@@ -369,6 +369,7 @@ def learn(args,env, policy_fn, *,
             # logger.log("Optimizing...")
             # logger.log(fmt_row(13, loss_names))
             # Here we do a bunch of optimization epochs over the data
+            i = 0
             for _ in range(optim_epochs):
                 losses_ppo = [] # list of tuples, each of which gives the loss for a minibatch
                 losses_d_step = []
@@ -378,18 +379,21 @@ def learn(args,env, policy_fn, *,
                     *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                     adam_pi.update(g_ppo, optim_stepsize * cur_lrmult)
                     losses_ppo.append(newlosses)
-                    # update step discriminator
-                    ob_expert, _ = env.get_expert(optim_batchsize)
-                    loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
-                    adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
-                    losses_d_step.append(loss_d_step)
-                    # update final discriminator
-                    ob_expert, _ = env.get_expert(optim_batchsize,is_final=True)
-                    seg_final_adj,seg_final_node = final_ob_generator(args,pi,env,optim_batchsize,True)
-                    loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg_final_adj,
-                                                                  seg_final_node)
-                    adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
-                    losses_d_final.append(loss_d_final)
+                    if i%2==0:
+                        # update step discriminator
+                        ob_expert, _ = env.get_expert(optim_batchsize)
+                        loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
+                        adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
+                        losses_d_step.append(loss_d_step)
+                    if i%8==0:
+                        # update final discriminator
+                        ob_expert, _ = env.get_expert(optim_batchsize,is_final=True)
+                        seg_final_adj,seg_final_node = final_ob_generator(args,pi,env,optim_batchsize,True)
+                        loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg_final_adj,
+                                                                      seg_final_node)
+                        adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
+                        losses_d_final.append(loss_d_final)
+                    i += 1
                 loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)
                 loss_d_final = np.mean(losses_d_final, axis=0, keepdims=True)
                 # logger.log(fmt_row(13, np.mean(losses, axis=0)))
