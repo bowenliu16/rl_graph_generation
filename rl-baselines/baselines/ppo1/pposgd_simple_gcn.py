@@ -22,6 +22,8 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,d_step,d_final):
     cur_ep_len = 0 # len of current episode
     ep_rets = [] # returns of completed episodes in this segment
     ep_lens = [] # lengths of ...
+    rews_final = []
+    rews_d_final = []
 
     # Initialize history arrays
     # obs = np.array([ob for _ in range(horizon)])
@@ -53,7 +55,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,d_step,d_final):
         if t > 0 and t % horizon == 0:
             yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes, "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens,"rews_final":rews_final, "rews_d_final":rews_d_final, "rews_d_step"}
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens,"rews_final":rews_final, "rews_d_final":rews_d_final, "rews_d_step":rews_d_step}
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
@@ -78,13 +80,14 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,d_step,d_final):
         rew_d_step = args.gan_step_ratio*(1-d_step(ob['adj'][np.newaxis,:,:,:],ob['node'][np.newaxis,:,:,:])[0])/env.max_atom # make it positive
         rew += rew_d_final+rew_d_step
         rews[i] = rew
+        rews_d_step[i] = rew_d_step
 
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
             with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
-                str = ''.join(['{},']*(len(info)+1))[:-1]+'\n'
-                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],rew_d,rew,info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
+                str = ''.join(['{},']*(len(info)+2))[:-1]+'\n'
+                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],rew_d_step,rew_d_final,rew,info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             rews_final.append(rew)
