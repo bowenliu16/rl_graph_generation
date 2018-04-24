@@ -1,1 +1,5 @@
 *.pyc
+.idea/
+test.py
+rl-baselines/baselines/ppo1/molecule_gen/
+rl-baselines/baselines/ppo1/runs/
