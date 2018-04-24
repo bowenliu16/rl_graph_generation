@@ -1,0 +1,6 @@
+README.md
+gym_molecule.egg-info/PKG-INFO
+gym_molecule.egg-info/SOURCES.txt
+gym_molecule.egg-info/dependency_links.txt
+gym_molecule.egg-info/requires.txt
+gym_molecule.egg-info/top_level.txt
