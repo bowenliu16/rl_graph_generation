@@ -115,28 +115,33 @@ class MoleculeEnv(gym.Env):
         self.mol_old = copy.deepcopy(self.mol) # keep old mol
         total_atoms = self.mol.GetNumAtoms()
 
-        ### take action
-        if action[0,3]==0: # not stop
-            stop = False
-            if action[0, 1] >= total_atoms:
-                self._add_atom(action[0, 1] - total_atoms)  # add new node
-                action[0, 1] = total_atoms  # new node id
-                self._add_bond(action)  # add new edge
-            else:
-                self._add_bond(action)  # add new edge
-        else: # stop
-            stop = True
+        try:
+            ### take action
+            if action[0,3]==0: # not stop
+                stop = False
+                if action[0, 1] >= total_atoms:
+                    self._add_atom(action[0, 1] - total_atoms)  # add new node
+                    action[0, 1] = total_atoms  # new node id
+                    self._add_bond(action)  # add new edge
+                else:
+                    self._add_bond(action)  # add new edge
+            else: # stop
+                stop = True
 
-        ### calculate intermediate rewards
-        if self.check_valency():
-            if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
-                reward_step = self.step_ratio / self.max_atom # successfully add node/edge
+
+            ### calculate intermediate rewards
+            if self.check_valency():
+                if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
+                    reward_step = self.step_ratio / self.max_atom # successfully add node/edge
+                else:
+                    reward_step = -self.step_ratio / self.max_atom # edge exist
             else:
-                reward_step = -self.step_ratio / self.max_atom # edge exist
-        else:
+                reward_step = -self.step_ratio / self.max_atom  # invalid action
+                self.mol = self.mol_old
+        except:
             reward_step = -self.step_ratio / self.max_atom  # invalid action
-            self.mol = self.mol_old
-        self.smile_list.append(self.get_final_smiles())
+            print('action error',action,'num atoms',self.mol.GetNumAtoms())
+            self.smile_list.append(self.get_final_smiles())
 
         ### calculate terminal rewards
         # todo: add terminal action
