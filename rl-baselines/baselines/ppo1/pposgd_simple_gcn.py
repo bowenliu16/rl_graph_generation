@@ -86,8 +86,8 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,d_step,d_final):
         cur_ep_len += 1
         if new:
             with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
-                str = ''.join(['{},']*(len(info)+2))[:-1]+'\n'
-                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],rew_d_step,rew_d_final,rew,info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
+                str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
+                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],info['reward'],rew_d_step,rew_d_final,rew,info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             rews_final.append(rew)
