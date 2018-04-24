@@ -120,7 +120,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,d_step,d_final):
 #         if new:
 #             i = t % batch_size
 #             ob_adjs[i] = ob['adj']
-#             ob_nodes[i] = ob['node']
+#             ob_nodes[i] = ob['node']git
 #             ob = env.reset()
 #             print('reset')
 #             t += 1
