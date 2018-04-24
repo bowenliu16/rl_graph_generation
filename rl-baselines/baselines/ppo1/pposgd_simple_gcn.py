@@ -98,26 +98,54 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,d_step,d_final):
 
         t += 1
 
+
+## cannnot finnd any bug for 2 hours.... but just break :((((((
+# def final_ob_generator(args, pi, env, batch_size, stochastic):
+#     t = 0
+#     ob = env.reset()
+#     ob_adj = ob['adj']
+#     ob_node = ob['node']
+#     # Initialize history arrays
+#     ob_adjs = np.array([ob_adj for _ in range(batch_size)])
+#     ob_nodes = np.array([ob_node for _ in range(batch_size)])
+#
+#     while True:
+#         ac, vpred, debug = pi.act(stochastic, ob)
+#         if t==32:
+#             # print(t,ob,ac)
+#             print(ob['adj'].shape,ob['node'].shape,ac.shape)
+#         if t > 0 and t % batch_size == 0:
+#             yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes}
+#         ob, rew, new, info = env.step(ac)
+#         if new:
+#             i = t % batch_size
+#             ob_adjs[i] = ob['adj']
+#             ob_nodes[i] = ob['node']
+#             ob = env.reset()
+#             print('reset')
+#             t += 1
+
+
 def final_ob_generator(args, pi, env, batch_size, stochastic):
-    t = 0
     ob = env.reset()
     ob_adj = ob['adj']
     ob_node = ob['node']
     # Initialize history arrays
     ob_adjs = np.array([ob_adj for _ in range(batch_size)])
     ob_nodes = np.array([ob_node for _ in range(batch_size)])
+    for i in range(batch_size):
+        ob = env.reset()
+        while True:
+            ac, vpred, debug = pi.act(stochastic, ob)
+            ob, rew, new, info = env.step(ac)
+            if new:
+                ob_adjs[i]=ob['adj']
+                ob_nodes[i]=ob['node']
+                break
+    return ob_adjs,ob_nodes
 
-    while True:
-        ac, vpred, debug = pi.act(stochastic, ob)
-        if t > 0 and t % batch_size == 0:
-            yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes}
-        ob, rew, new, info = env.step(ac)
-        if new:
-            i = t % batch_size
-            ob_adjs[i] = ob['adj']
-            ob_nodes[i] = ob['node']
-            ob = env.reset()
-            t += 1
+
+
 
 def add_vtarg_and_adv(seg, gamma, lam):
     """
@@ -200,9 +228,9 @@ def learn(args,env, policy_fn, *,
 
     ## Discriminator loss
     loss_d_step, _, _ = discriminator(ob, ob_gen, name='d_step')
-    loss_d_step_gen = discriminator_net(ob_gen, name='d_step')
+    loss_d_step_gen_value = discriminator_net(ob_gen, name='d_step')
     loss_d_final, _, _ = discriminator(ob, ob_gen, name='d_final')
-    loss_d_final_gen = discriminator_net(ob_gen, name='d_final')
+    loss_d_final_gen_value = discriminator_net(ob_gen, name='d_final')
 
     var_list_pi = pi.get_trainable_variables()
     var_list_d_step = [var for var in tf.global_variables() if 'd_step' in var.name]
@@ -241,8 +269,8 @@ def learn(args,env, policy_fn, *,
     lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi)])
     lossandgrad_d_step = U.function([ob['adj'], ob['node'], ob_gen['adj'], ob_gen['node']], [loss_d_step, U.flatgrad(loss_d_step, var_list_d_step)])
     lossandgrad_d_final = U.function([ob['adj'], ob['node'], ob_gen['adj'], ob_gen['node']], [loss_d_final, U.flatgrad(loss_d_final, var_list_d_final)])
-    loss_d_step_gen = U.function([ob_gen['adj'], ob_gen['node']], loss_d_step_gen)
-    loss_d_final_gen = U.function([ob_gen['adj'], ob_gen['node']], loss_d_final_gen)
+    loss_d_step_gen = U.function([ob_gen['adj'], ob_gen['node']], loss_d_step_gen_value)
+    loss_d_final_gen = U.function([ob_gen['adj'], ob_gen['node']], loss_d_final_gen_value)
 
 
 
@@ -274,7 +302,7 @@ def learn(args,env, policy_fn, *,
     rewbuffer = deque(maxlen=100) # rolling buffer for episode rewards
 
     seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_step_gen,loss_d_final_gen)
-    final_ob_gen = final_ob_generator(args,pi,env,optim_batchsize,True)
+    # final_ob_gen = final_ob_generator(args,pi,env,optim_batchsize,True)
 
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
@@ -357,9 +385,9 @@ def learn(args,env, policy_fn, *,
                     losses_d_step.append(loss_d_step)
                     # update final discriminator
                     ob_expert, _ = env.get_expert(optim_batchsize,is_final=True)
-                    seg_final = final_ob_gen.__next__()
-                    loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg_final["ob_adj"],
-                                                               seg_final["ob_node"])
+                    seg_final_adj,seg_final_node = final_ob_generator(args,pi,env,optim_batchsize,True)
+                    loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg_final_adj,
+                                                                  seg_final_node)
                     adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
                     losses_d_final.append(loss_d_final)
                 loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)

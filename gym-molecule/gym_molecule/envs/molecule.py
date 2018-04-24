@@ -289,7 +289,6 @@ class MoleculeEnv(gym.Env):
         # type to new bond type. Otherwise create bond between current atom and
         # other atom with the new bond type
         bond = self.mol.GetBondBetweenAtoms(int(action[0,0]), int(action[0,1]))
-        print(action)
         if bond:
             # print('bond exist!')
             return False
