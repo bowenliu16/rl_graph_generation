@@ -197,6 +197,7 @@ def learn(args,env, policy_fn, *,
     loss_discriminator_gen = discriminator_net(ob_gen,name='d_net')
 
     var_list_pi = pi.get_trainable_variables()
+    var_list_pi_stop = [var for var in var_list_pi if 'emb'or'gcn'or'stop' in var.name]
     var_list_d = [var for var in tf.global_variables() if 'd_net' in var.name]
 
     ## debug
@@ -236,7 +237,9 @@ def learn(args,env, policy_fn, *,
 
 
     adam_pi = MpiAdam(var_list_pi, epsilon=adam_epsilon)
+    adam_pi_stop = MpiAdam(var_list_pi_stop, epsilon=adam_epsilon)
     adam_discriminator = MpiAdam(var_list_d, epsilon=adam_epsilon)
+
 
     assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
         for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
@@ -295,16 +298,24 @@ def learn(args,env, policy_fn, *,
 
         ## Expert
         loss_expert=0
+        loss_expert_stop=0
         g_expert=0
         if args.has_expert==1:
             ## Expert train
             losses = []  # list of tuples, each of which gives the loss for a minibatch
+            losses_stop = []  # list of tuples, each of which gives the loss for a minibatch
             for _ in range(optim_epochs*2):
                 ob_expert, ac_expert = env.get_expert(optim_batchsize)
                 losses_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
                 adam_pi.update(g_expert, optim_stepsize * cur_lrmult)
                 losses.append(losses_expert)
+                # learn how to stop
+                ob_expert, ac_expert = env.get_expert(optim_batchsize,is_final=True)
+                losses_expert_stop, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
+                adam_pi_stop.update(g_expert, optim_stepsize * cur_lrmult)
+                losses_stop.append(losses_expert_stop)
             loss_expert = np.mean(losses, axis=0, keepdims=True)
+            loss_expert_stop = np.mean(losses_stop, axis=0, keepdims=True)
             # logger.log(fmt_row(13, loss_expert))
 
 
@@ -366,6 +377,7 @@ def learn(args,env, policy_fn, *,
 
         if writer is not None:
             writer.add_scalar("loss_expert", loss_expert, iters_so_far)
+            writer.add_scalar("loss_expert_stop", loss_expert_stop, iters_so_far)
             writer.add_scalar("loss_discriminator", loss_discriminator, iters_so_far)
             writer.add_scalar('grad_expert_min', np.amin(g_expert), iters_so_far)
             writer.add_scalar('grad_expert_max', np.amax(g_expert), iters_so_far)

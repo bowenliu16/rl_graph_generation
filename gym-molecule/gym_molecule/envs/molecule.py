@@ -15,6 +15,7 @@ from gym_molecule.envs.sascorer import calculateScore
 from gym_molecule.dataset.dataset_utils import gdb_dataset,mol_to_nx,nx_to_mol
 import random
 import time
+import matplotlib.pyplot as plt
 
 from contextlib import contextmanager
 import sys, os
@@ -471,7 +472,7 @@ class MoleculeEnv(gym.Env):
         return ob
 
 
-    def get_expert(self, batch_size):
+    def get_expert(self, batch_size,is_final=False):
         ob = {}
         atom_type_num = len(self.possible_atom_types)
         bond_type_num = len(self.possible_bond_types)
@@ -489,11 +490,14 @@ class MoleculeEnv(gym.Env):
             graph = mol_to_nx(mol)
             edges = graph.edges()
             # select the edge num for the subgraph
-            edges_sub_len = random.randint(1,len(edges))
+            if is_final:
+                edges_sub_len = len(edges)
+            else:
+                edges_sub_len = random.randint(1,len(edges))
             edges_sub = random.sample(edges,k=edges_sub_len)
             graph_sub = nx.Graph(edges_sub)
             graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)
-            if edges_sub_len==len(edges): # when the subgraph the whole molecule, the expert show stop sign
+            if is_final: # when the subgraph the whole molecule, the expert show stop sign
                 node1 = random.randint(0,mol.GetNumAtoms()-1)
                 while True:
                     node2 = random.randint(0,mol.GetNumAtoms()+atom_type_num-1)
@@ -523,7 +527,10 @@ class MoleculeEnv(gym.Env):
                     print('Expert policy error!')
                 edge_type = np.argmax(graph[edge_sample[0]][edge_sample[1]]['bond_type'] == self.possible_bond_types)
                 ac[i,:] = [node1,node2,edge_type,0] # don't stop
-
+            # print('action',ac)
+            # plt.axis("off")
+            # nx.draw_networkx(graph_sub)
+            # plt.show()
             ### get observation
             n = graph_sub.number_of_nodes()
             for node_id, node in enumerate(graph_sub.nodes()):
@@ -983,8 +990,8 @@ if __name__ == '__main__':
     # print(max(atom_list),max(bond_list))
 
 
-    print(reward_penalized_log_p(Chem.MolFromSmiles('CCO')))
-
+    # print(reward_penalized_log_p(Chem.MolFromSmiles('CCO')))
+    env.get_expert(4)
 
     # env.step(np.array([[0,3,0]]))
     # env.step(np.array([[1,4,0]]))
