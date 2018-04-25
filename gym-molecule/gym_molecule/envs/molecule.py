@@ -990,8 +990,8 @@ if __name__ == '__main__':
     # print(max(atom_list),max(bond_list))
 
 
-    # print(reward_penalized_log_p(Chem.MolFromSmiles('CCO')))
-    env.get_expert(4)
+    print(reward_penalized_log_p(Chem.MolFromSmiles('O=C1OC(F)=C(F)C(N2C(O)=C2C2CC2)=C1Cl')))
+    # env.get_expert(4)
 
     # env.step(np.array([[0,3,0]]))
     # env.step(np.array([[1,4,0]]))
