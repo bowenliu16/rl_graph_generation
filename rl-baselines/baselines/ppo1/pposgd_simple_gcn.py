@@ -22,10 +22,12 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
     cur_ep_ret_env = 0
     cur_ep_ret_d = 0
     cur_ep_len = 0 # len of current episode
+    cur_ep_len_valid = 0
     ep_rets = [] # returns of completed episodes in this segment
     ep_rets_d = []
     ep_rets_env = []
     ep_lens = [] # lengths of ...
+    ep_lens_valid = [] # lengths of ...
     ep_rew_final = []
 
 
@@ -59,11 +61,12 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
         if t > 0 and t % horizon == 0:
             yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes, "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "ep_final_rew":ep_rew_final,"ep_rets_env" : ep_rets_env,"ep_rets_d" : ep_rets_d}
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "ep_lens_valid" : ep_lens_valid, "ep_final_rew":ep_rew_final,"ep_rets_env" : ep_rets_env,"ep_rets_d" : ep_rets_d}
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
+            ep_lens_valid = []
             ep_rew_final = []
             ep_rets_d = []
             ep_rets_env = []
@@ -86,6 +89,8 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
         cur_ep_ret_d += rew_d
         cur_ep_ret_env += rew_env
         cur_ep_len += 1
+        if rew_env>0:
+            cur_ep_len_valid += 1
         if new:
             with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
                 str = ''.join(['{},']*(len(info)+2))[:-1]+'\n'
@@ -94,9 +99,11 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
             ep_rets_env.append(cur_ep_ret_env)
             ep_rets_d.append(cur_ep_ret_d)
             ep_lens.append(cur_ep_len)
+            ep_lens_valid.append(cur_ep_len_valid)
             ep_rew_final.append(rew_env)
             cur_ep_ret = 0
             cur_ep_len = 0
+            cur_ep_len_valid = 0
             cur_ep_ret_d = 0
             cur_ep_ret_env = 0
             ob = env.reset()
@@ -247,6 +254,7 @@ def learn(args,env, policy_fn, *,
     iters_so_far = 0
     tstart = time.time()
     lenbuffer = deque(maxlen=100) # rolling buffer for episode lengths
+    lenbuffer_valid = deque(maxlen=100) # rolling buffer for episode lengths
     rewbuffer = deque(maxlen=100) # rolling buffer for episode rewards
     rewbuffer_env = deque(maxlen=100) # rolling buffer for episode rewards
     rewbuffer_d = deque(maxlen=100) # rolling buffer for episode rewards
@@ -374,10 +382,11 @@ def learn(args,env, policy_fn, *,
         # logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
         if writer is not None:
             writer.add_scalar("ev_tdlam_before", explained_variance(vpredbefore, tdlamret), iters_so_far)
-        lrlocal = (seg["ep_lens"], seg["ep_rets"],seg["ep_rets_env"],seg["ep_rets_d"],seg["ep_final_rew"]) # local values
+        lrlocal = (seg["ep_lens"],seg["ep_lens_valid"], seg["ep_rets"],seg["ep_rets_env"],seg["ep_rets_d"],seg["ep_final_rew"]) # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
-        lens, rews,rews_env,rews_d,rews_final = map(flatten_lists, zip(*listoflrpairs))
+        lens,lens_valid,rews,rews_env,rews_d,rews_final = map(flatten_lists, zip(*listoflrpairs))
         lenbuffer.extend(lens)
+        lenbuffer_valid.extend(lens_valid)
         rewbuffer.extend(rews)
         rewbuffer_d.extend(rews_d)
         rewbuffer_env.extend(rews_env)
@@ -387,6 +396,7 @@ def learn(args,env, policy_fn, *,
         # logger.record_tabular("EpThisIter", len(lens))
         if writer is not None:
             writer.add_scalar("EpLenMean", np.mean(lenbuffer),iters_so_far)
+            writer.add_scalar("EpLenValidMean", np.mean(lenbuffer_valid),iters_so_far)
             writer.add_scalar("EpRewMean", np.mean(rewbuffer),iters_so_far)
             writer.add_scalar("EpRewDMean", np.mean(rewbuffer_d),iters_so_far)
             writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env),iters_so_far)
