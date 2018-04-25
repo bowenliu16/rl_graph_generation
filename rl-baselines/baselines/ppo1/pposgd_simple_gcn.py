@@ -81,16 +81,19 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
         prevacs[i] = prevac
 
         ob, rew_env, new, info = env.step(ac)
-        # add stepwise discriminator reward
-        rew_d = args.gan_ratio*(1-discriminator_func(ob['adj'][np.newaxis,:,:,:],ob['node'][np.newaxis,:,:,:])[0])/env.max_atom
+        rew_d = 0 # default
+        if rew_env>0: # if action valid
+            cur_ep_len_valid += 1
+            # add stepwise discriminator reward
+            rew_d = args.gan_ratio * (
+            1 - discriminator_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0]) / env.max_atom
         rews[i] = rew_d+rew_env
 
         cur_ep_ret += rew_d+rew_env
         cur_ep_ret_d += rew_d
         cur_ep_ret_env += rew_env
         cur_ep_len += 1
-        if rew_env>0:
-            cur_ep_len_valid += 1
+
         if new:
             with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
                 str = ''.join(['{},']*(len(info)+2))[:-1]+'\n'
