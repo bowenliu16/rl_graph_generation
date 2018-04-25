@@ -19,9 +19,16 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
     ob_node = ob['node']
 
     cur_ep_ret = 0 # return in current episode
+    cur_ep_ret_env = 0
+    cur_ep_ret_d = 0
     cur_ep_len = 0 # len of current episode
     ep_rets = [] # returns of completed episodes in this segment
+    ep_rets_d = []
+    ep_rets_env = []
     ep_lens = [] # lengths of ...
+    ep_rew_final = []
+
+
 
     # Initialize history arrays
     # obs = np.array([ob for _ in range(horizon)])
@@ -52,11 +59,15 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
         if t > 0 and t % horizon == 0:
             yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes, "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens}
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "ep_final_rew":ep_rew_final,"ep_rets_env" : ep_rets_env,"ep_rets_d" : ep_rets_d}
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
+            ep_rew_final = []
+            ep_rets_d = []
+            ep_rets_env = []
+
         i = t % horizon
         # obs[i] = ob
         ob_adjs[i] = ob['adj']
@@ -66,22 +77,28 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
         acs[i] = ac
         prevacs[i] = prevac
 
-        ob, rew, new, info = env.step(ac)
+        ob, rew_env, new, info = env.step(ac)
         # add stepwise discriminator reward
         rew_d = args.gan_ratio*(1-discriminator_func(ob['adj'][np.newaxis,:,:,:],ob['node'][np.newaxis,:,:,:])[0])/env.max_atom
-        rew += rew_d
-        rews[i] = rew
+        rews[i] = rew_d+rew_env
 
-        cur_ep_ret += rew
+        cur_ep_ret += rew_d+rew_env
+        cur_ep_ret_d += rew_d
+        cur_ep_ret_env += rew_env
         cur_ep_len += 1
         if new:
             with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
                 str = ''.join(['{},']*(len(info)+2))[:-1]+'\n'
                 f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],info['reward'],rew_d,rew,info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
             ep_rets.append(cur_ep_ret)
+            ep_rets_env.append(cur_ep_ret_env)
+            ep_rets_d.append(cur_ep_ret_d)
             ep_lens.append(cur_ep_len)
+            ep_rew_final.append(rew_env)
             cur_ep_ret = 0
             cur_ep_len = 0
+            cur_ep_ret_d = 0
+            cur_ep_ret_env = 0
             ob = env.reset()
 
         t += 1
@@ -231,6 +248,10 @@ def learn(args,env, policy_fn, *,
     tstart = time.time()
     lenbuffer = deque(maxlen=100) # rolling buffer for episode lengths
     rewbuffer = deque(maxlen=100) # rolling buffer for episode rewards
+    rewbuffer_env = deque(maxlen=100) # rolling buffer for episode rewards
+    rewbuffer_d = deque(maxlen=100) # rolling buffer for episode rewards
+    rewbuffer_final = deque(maxlen=100) # rolling buffer for episode rewards
+
 
     seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True,loss_discriminator_gen_func)
 
@@ -353,17 +374,23 @@ def learn(args,env, policy_fn, *,
         # logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
         if writer is not None:
             writer.add_scalar("ev_tdlam_before", explained_variance(vpredbefore, tdlamret), iters_so_far)
-        lrlocal = (seg["ep_lens"], seg["ep_rets"]) # local values
+        lrlocal = (seg["ep_lens"], seg["ep_rets"],seg["ep_rets_env"],seg["ep_rets_d"],seg["ep_final_rew"]) # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
-        lens, rews = map(flatten_lists, zip(*listoflrpairs))
+        lens, rews,rews_env,rews_d,rews_final = map(flatten_lists, zip(*listoflrpairs))
         lenbuffer.extend(lens)
         rewbuffer.extend(rews)
+        rewbuffer_d.extend(rews_d)
+        rewbuffer_env.extend(rews_env)
+        rewbuffer_final.extend(rews_final)
         # logger.record_tabular("EpLenMean", np.mean(lenbuffer))
         # logger.record_tabular("EpRewMean", np.mean(rewbuffer))
         # logger.record_tabular("EpThisIter", len(lens))
         if writer is not None:
             writer.add_scalar("EpLenMean", np.mean(lenbuffer),iters_so_far)
             writer.add_scalar("EpRewMean", np.mean(rewbuffer),iters_so_far)
+            writer.add_scalar("EpRewDMean", np.mean(rewbuffer_d),iters_so_far)
+            writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env),iters_so_far)
+            writer.add_scalar("EpRewFinalMean", np.mean(rewbuffer_final),iters_so_far)
             writer.add_scalar("EpThisIter", len(lens), iters_so_far)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
