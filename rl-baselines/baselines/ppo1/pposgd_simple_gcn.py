@@ -89,7 +89,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
         if new:
             with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
                 str = ''.join(['{},']*(len(info)+2))[:-1]+'\n'
-                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],info['reward'],rew_d,rew,info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
+                f.write(str.format(info['smile'],info['reward_valid'],info['reward_qed'],info['reward_sa'],info['reward_logp'],rew_env,rew_d,rew_d+rew_env,info['flag_steric_strain_filter'],info['flag_zinc_molecule_filter'],info['stop']))
             ep_rets.append(cur_ep_ret)
             ep_rets_env.append(cur_ep_ret_env)
             ep_rets_d.append(cur_ep_ret_d)
