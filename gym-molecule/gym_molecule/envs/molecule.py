@@ -131,18 +131,18 @@ class MoleculeEnv(gym.Env):
         if self.check_valency():
             if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
                 reward_step = self.reward_step_total/self.max_atom # successfully add node/edge
+                self.smile_list.append(self.get_final_smiles())
             else:
                 reward_step = -self.reward_step_total/self.max_atom # edge exist
         else:
             reward_step = -self.reward_step_total/self.max_atom  # invalid action
             self.mol = self.mol_old
-        self.smile_list.append(self.get_final_smiles())
 
         ### calculate terminal rewards
         # todo: add terminal action
         if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop:
             # default reward
-            reward_valid = 0
+            reward_valid = 6
             reward_qed = 0
             reward_sa = 0
             reward_logp = 0
@@ -180,7 +180,7 @@ class MoleculeEnv(gym.Env):
                     print('reward error')
 
             new = True # end of episode
-            reward = reward_step + reward_valid + reward_qed + reward_sa + reward_logp
+            reward = reward_step + reward_valid# + reward_qed + reward_sa + reward_logp
             # reward = reward_step + reward_valid + reward_logp
             info['smile'] = self.get_final_smiles()
             info['reward_valid'] = reward_valid
@@ -899,6 +899,7 @@ def reward_penalized_log_p(mol):
 
     return normalized_log_p + normalized_SA + normalized_cycle
 
+
 # # TEST compare with junction tree paper examples from Figure 7
 # assert round(reward_penalized_log_p(Chem.MolFromSmiles('ClC1=CC=C2C(C=C(C('
 #                                                        'C)=O)C(C(NC3=CC(NC('
@@ -966,20 +967,24 @@ if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
     env.init()
 
-    ob = env.reset()
-    print(ob['adj'].shape)
-    print(ob['node'].shape)
+    # ob = env.reset()
+    # print(ob['adj'].shape)
+    # print(ob['node'].shape)
+    #
+    # ob,ac = env.get_expert(4)
+    # print(ob)
+    # print(ac)
 
-    ob,ac = env.get_expert(4)
-    print(ob)
-    print(ac)
+    # atom_list = []
+    # bond_list = []
+    # for i in range(100):
+    #     atom_list.append(env.dataset[i].GetNumAtoms())
+    #     bond_list.append(env.dataset[i].GetNumBonds())
+    # print(max(atom_list),max(bond_list))
 
-    atom_list = []
-    bond_list = []
-    for i in range(100):
-        atom_list.append(env.dataset[i].GetNumAtoms())
-        bond_list.append(env.dataset[i].GetNumBonds())
-    print(max(atom_list),max(bond_list))
+
+    print(reward_penalized_log_p(Chem.MolFromSmiles('CCO')))
+
 
     # env.step(np.array([[0,3,0]]))
     # env.step(np.array([[1,4,0]]))

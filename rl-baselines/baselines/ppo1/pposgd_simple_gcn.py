@@ -68,7 +68,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
 
         ob, rew, new, info = env.step(ac)
         # add stepwise discriminator reward
-        rew_d = -args.gan_ratio*discriminator_func(ob['adj'][np.newaxis,:,:,:],ob['node'][np.newaxis,:,:,:])[0]/env.max_atom
+        rew_d = args.gan_ratio*(1-discriminator_func(ob['adj'][np.newaxis,:,:,:],ob['node'][np.newaxis,:,:,:])[0])/env.max_atom
         rew += rew_d
         rews[i] = rew
 

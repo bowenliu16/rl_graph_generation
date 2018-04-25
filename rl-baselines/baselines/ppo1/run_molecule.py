@@ -67,11 +67,11 @@ def molecule_arg_parser():
     parser.add_argument('--num_timesteps', type=int, default=int(10e7))
     parser.add_argument('--name', type=str, default='test')
     parser.add_argument('--dataset', type=str, default='zinc')
-    parser.add_argument('--logp_ratio', type=float, default=0)
+    parser.add_argument('--logp_ratio', type=float, default=1)
     parser.add_argument('--qed_ratio', type=float, default=1)
     parser.add_argument('--sa_ratio', type=float, default=1)
     parser.add_argument('--gan_ratio', type=float, default=1)
-    parser.add_argument('--reward_step_total', type=float, default=0.5)
+    parser.add_argument('--reward_step_total', type=float, default=1)
     parser.add_argument('--has_rl', type=int, default=1)
     parser.add_argument('--has_expert', type=int, default=1)
 
