@@ -233,14 +233,14 @@ class GCNPolicy(object):
 
         self.ac = tf.concat((tf.expand_dims(ac_first,axis=1),tf.expand_dims(ac_second,axis=1),tf.expand_dims(ac_edge,axis=1),tf.expand_dims(ac_stop,axis=1)),axis=1)
 
-        print('ob_adj', ob['adj'].get_shape(),
-              'ob_node', ob['node'].get_shape())
-        print('logits_first', self.logits_first.get_shape(),
-              'logits_second', self.logits_second.get_shape(),
-              'logits_edge', self.logits_edge.get_shape())
-        print('ac_edge', ac_edge.get_shape())
-        for var in tf.trainable_variables():
-            print('variable', var)
+        # print('ob_adj', ob['adj'].get_shape(),
+        #       'ob_node', ob['node'].get_shape())
+        # print('logits_first', self.logits_first.get_shape(),
+        #       'logits_second', self.logits_second.get_shape(),
+        #       'logits_edge', self.logits_edge.get_shape())
+        # print('ac_edge', ac_edge.get_shape())
+        # for var in tf.trainable_variables():
+        #     print('variable', var)
 
         debug = {}
         debug['ob_node'] = tf.shape(ob['node'])

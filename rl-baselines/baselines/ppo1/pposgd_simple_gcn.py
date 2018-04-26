@@ -199,12 +199,12 @@ def learn(args,env, policy_fn, *,
     var_list_pi = pi.get_trainable_variables()
     var_list_pi_stop = [var for var in var_list_pi if ('emb' in var.name) or ('gcn' in var.name) or ('stop' in var.name)]
     var_list_d = [var for var in tf.global_variables() if 'd_net' in var.name]
-    for var in var_list_pi:
-        print('var_list_pi',var)
-    for var in var_list_pi_stop:
-        print('var_list_pi_stop', var)
-    for var in var_list_d:
-        print('var_list_d', var)
+    # for var in var_list_pi:
+    #     print('var_list_pi',var)
+    # for var in var_list_pi_stop:
+    #     print('var_list_pi_stop', var)
+    # for var in var_list_d:
+    #     print('var_list_d', var)
     ## debug
     debug={}
     debug['ac'] = ac
