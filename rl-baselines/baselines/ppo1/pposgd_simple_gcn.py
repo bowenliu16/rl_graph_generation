@@ -337,6 +337,7 @@ def learn(args,env, policy_fn, *,
         except:
             print(fname,'ckpt not found, start with iters 0')
 
+    counter = 0
     ## start training
     while True:
         if callback: callback(locals(), globals())
@@ -524,6 +525,9 @@ def learn(args,env, policy_fn, *,
 
 
         iters_so_far += 1
+        counter += 1
+        if counter==50:
+            env.level_up()
         # if MPI.COMM_WORLD.Get_rank()==0:
         #     logger.dump_tabular()
 
