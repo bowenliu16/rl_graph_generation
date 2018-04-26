@@ -135,7 +135,7 @@ class GCNPolicy(object):
         self.logits_stop = tf.reduce_sum(tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1'),axis=1)
         self.logits_stop_yes = tf.layers.dense(self.logits_stop, 1, activation=None, name='linear_stop2_1')  # B*1
         self.logits_stop_no = tf.layers.dense(self.logits_stop, 1, activation=None, name='linear_stop2_2')  # B*1
-        self.logits_stop = tf.concat((self.logits_stop_yes,self.logits_stop_no/10),axis=1)
+        self.logits_stop = tf.concat((self.logits_stop_yes,self.logits_stop_no-3),axis=1)
         pd_stop = CategoricalPdType(-1).pdfromflat(flat=self.logits_stop)
         ac_stop = pd_stop.sample()
 
@@ -248,7 +248,7 @@ class GCNPolicy(object):
         debug['emb_node'] = emb_node
         debug['emb_node1'] = self.emb_node1
         debug['emb_node2'] = self.emb_node2
-        debug['logits_first'] = self.logits_first
+        debug['logits_stop_yes'] = self.logits_stop_yes
         debug['logits_second'] = self.logits_second
         debug['ob_len'] = ob_len
         debug['logits_first_mask'] = logits_first_mask

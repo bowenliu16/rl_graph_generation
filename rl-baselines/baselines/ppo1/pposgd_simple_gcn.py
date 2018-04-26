@@ -48,7 +48,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic,discriminator_func
         ac, vpred, debug = pi.act(stochastic, ob)
         # print('ob',ob)
         # print('debug ob_len',debug['ob_len'])
-        # print('debug logits_first_mask', debug['logits_first_mask'])
+        # print('debug logits_stop_yes', debug['logits_stop_yes'])
         # print('debug logits_second_mask',debug['logits_second_mask'])
         # print('debug logits_first_mask', debug['logits_first_mask'])
         # print('debug logits_second_mask', debug['logits_second_mask'])
