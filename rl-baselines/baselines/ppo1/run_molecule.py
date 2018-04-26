@@ -13,7 +13,7 @@ import os
 import gym
 # import gym_molecule
 
-def train(args,env_id, num_timesteps, seed,writer=None):
+def train(args,seed,writer=None):
     from baselines.ppo1 import pposgd_simple_gcn, gcn_policy
     import baselines.common.tf_util as U
     rank = MPI.COMM_WORLD.Get_rank()
@@ -39,7 +39,7 @@ def train(args,env_id, num_timesteps, seed,writer=None):
     # env.seed(workerseed)
 
     pposgd_simple_gcn.learn(args,env, policy_fn,
-        max_timesteps=int(num_timesteps * 1.1),
+        max_timesteps=args.num_steps,
         timesteps_per_actorbatch=64,
         clip_param=0.2, entcoeff=0.01,
         optim_epochs=4, optim_stepsize=1e-3, optim_batchsize=32,
@@ -64,7 +64,7 @@ def molecule_arg_parser():
     parser.add_argument('--env', help='environment ID',
                         default='BreakoutNoFrameskip-v4')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--num_timesteps', type=int, default=int(10e7))
+    parser.add_argument('--num_steps', type=int, default=int(2e7))
     parser.add_argument('--name', type=str, default='test')
     parser.add_argument('--dataset', type=str, default='zinc')
     parser.add_argument('--logp_ratio', type=float, default=1)
@@ -72,8 +72,13 @@ def molecule_arg_parser():
     parser.add_argument('--sa_ratio', type=float, default=1)
     parser.add_argument('--gan_ratio', type=float, default=1)
     parser.add_argument('--reward_step_total', type=float, default=1)
-    parser.add_argument('--has_rl', type=int, default=1)
-    parser.add_argument('--has_expert', type=int, default=1)
+    # parser.add_argument('--has_rl', type=int, default=1)
+    # parser.add_argument('--has_expert', type=int, default=1)
+    parser.add_argument('--rl_start', type=int, default=200)
+    parser.add_argument('--rl_end', type=int, default=1e6)
+    parser.add_argument('--expert_start', type=int, default=0)
+    parser.add_argument('--expert_end', type=int, default=200)
+
 
 
 
@@ -95,7 +100,7 @@ def main():
     else:
         writer = None
     # try:
-    train(args,args.env, num_timesteps=args.num_timesteps, seed=args.seed,writer=writer)
+    train(args,seed=args.seed,writer=writer)
     # except:
     #     writer.export_scalars_to_json("./all_scalars.json")
     #     writer.close()

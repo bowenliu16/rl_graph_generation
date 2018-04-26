@@ -306,7 +306,8 @@ def learn(args,env, policy_fn, *,
         loss_expert=0
         loss_expert_stop=0
         g_expert=0
-        if args.has_expert==1:
+        # if args.has_expert==1:
+        if iters_so_far>=args.expert_start and iters_so_far<=args.expert_end:
             ## Expert train
             losses = []  # list of tuples, each of which gives the loss for a minibatch
             losses_stop = []  # list of tuples, each of which gives the loss for a minibatch
@@ -340,7 +341,8 @@ def learn(args,env, policy_fn, *,
         loss_discriminator=0
         g_ppo=0
         g_discriminator=0
-        if args.has_rl==1:
+        # if args.has_rl==1:
+        if iters_so_far>=args.rl_start and iters_so_far<=args.rl_end:
             ## PPO train
             assign_old_eq_new() # set old parameter values to new parameter values
             # logger.log("Optimizing...")
