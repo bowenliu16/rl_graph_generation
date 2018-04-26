@@ -236,6 +236,7 @@ def learn(args,env, policy_fn, *,
     ## loss update function
     lossandgrad_ppo = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list_pi)])
     lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi)])
+    lossandgrad_expert_stop = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi_stop)])
     lossandgrad_discriminator = U.function([ob['adj'],ob['node'],ob_gen['adj'],ob_gen['node']], [loss_discriminator, U.flatgrad(loss_discriminator, var_list_d)])
     loss_discriminator_gen_func = U.function([ob_gen['adj'],ob_gen['node']], loss_discriminator_gen)
 
@@ -316,7 +317,7 @@ def learn(args,env, policy_fn, *,
                 losses.append(losses_expert)
                 # learn how to stop
                 ob_expert, ac_expert = env.get_expert(optim_batchsize,is_final=True)
-                losses_expert_stop, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
+                losses_expert_stop, g_expert = lossandgrad_expert_stop(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
                 adam_pi_stop.update(g_expert, optim_stepsize * cur_lrmult)
                 losses_stop.append(losses_expert_stop)
             loss_expert = np.mean(losses, axis=0, keepdims=True)
