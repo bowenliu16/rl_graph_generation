@@ -9,6 +9,7 @@ from mpi4py import MPI
 from collections import deque
 from tensorboardX import SummaryWriter
 from baselines.ppo1.gcn_policy import discriminator,discriminator_net
+import os
 
 def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_final_func):
     t = 0
@@ -344,6 +345,25 @@ def learn(args,env, policy_fn, *,
         if MPI.COMM_WORLD.Get_rank() == 0:
             with open('molecule_gen/' + args.dataset+'_'+args.name + '.csv', 'a') as f:
                 f.write('***** Iteration {} *****\n'.format(iters_so_far))
+            # save
+            if iters_so_far % args.save_every == 0:
+                fname = 'ckpt/' + args.dataset + '_' + args.name + '_' + str(iters_so_far)
+                saver = tf.train.Saver(var_list_pi)
+                saver.save(tf.get_default_session(), fname)
+                print('model saved!',fname)
+                # fname = os.path.join(ckpt_dir, task_name)
+                # os.makedirs(os.path.dirname(fname), exist_ok=True)
+                # saver = tf.train.Saver()
+                # saver.save(tf.get_default_session(), fname)
+            if iters_so_far==args.load_step:
+                try:
+                    fname = 'ckpt/' + args.dataset + '_' + args.name + '_' + str(iters_so_far)
+                    saver.restore(tf.get_default_session(), fname)
+                    iters_so_far=int(fname.split('_')[-1])
+                    print('model restored!',fname,'iters_so_far:',iters_so_far)
+                except:
+                    print('ckpt not found, start with iters 0')
+
 
         ## Expert
         loss_expert=0
@@ -367,7 +387,6 @@ def learn(args,env, policy_fn, *,
             loss_expert = np.mean(losses, axis=0, keepdims=True)
             loss_expert_stop = np.mean(losses_stop, axis=0, keepdims=True)
             # logger.log(fmt_row(13, loss_expert))
-
 
         ## PPO
         seg = seg_gen.__next__()
