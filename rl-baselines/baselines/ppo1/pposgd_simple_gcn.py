@@ -526,8 +526,9 @@ def learn(args,env, policy_fn, *,
 
         iters_so_far += 1
         counter += 1
-        if counter==args.curriculum1:
-            env.level_up()
+        if args.curriculum==1:
+            if counter==args.curriculum1:
+                env.level_up()
         # if MPI.COMM_WORLD.Get_rank()==0:
         #     logger.dump_tabular()
 
