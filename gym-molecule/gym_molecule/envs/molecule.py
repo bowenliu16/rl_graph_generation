@@ -974,7 +974,8 @@ if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
     env.init()
 
-    # ob = env.reset()
+    ob = env.reset()
+
     # print(ob['adj'].shape)
     # print(ob['node'].shape)
     #
