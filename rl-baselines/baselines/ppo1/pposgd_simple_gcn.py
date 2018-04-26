@@ -359,7 +359,7 @@ def learn(args,env, policy_fn, *,
                 # saver.save(tf.get_default_session(), fname)
             if iters_so_far==args.load_step:
                 try:
-                    fname = 'ckpt/' + args.dataset + '_' + args.name + '_' + str(iters_so_far)
+                    fname = 'ckpt/' + args.dataset_load + '_' + args.name_load + '_' + str(iters_so_far)
                     saver.restore(tf.get_default_session(), fname)
                     iters_so_far=int(fname.split('_')[-1])
                     print('model restored!',fname,'iters_so_far:',iters_so_far)
