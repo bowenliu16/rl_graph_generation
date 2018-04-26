@@ -175,14 +175,14 @@ class MoleculeEnv(gym.Env):
                     sa = -1 * calculateScore(final_mol)
                     reward_sa += (sa + 10) / (10 - 1) * self.sa_ratio
                     # 3. Logp reward. Higher the better
-                    reward_logp += MolLogP(self.mol)/10 * self.logp_ratio
-                    # reward_logp += reward_penalized_log_p(final_mol)
+                    # reward_logp += MolLogP(self.mol)/10 * self.logp_ratio
+                    reward_logp += reward_penalized_log_p(final_mol)
                 except: # if any property reward error, reset all
                     print('reward error')
 
             new = True # end of episode
-            reward = reward_step + reward_valid# + reward_qed + reward_sa + reward_logp
-            # reward = reward_step + reward_valid + reward_logp
+            # reward = reward_step + reward_valid# + reward_qed + reward_sa + reward_logp
+            reward = reward_step + reward_valid + reward_logp
             info['smile'] = self.get_final_smiles()
             info['reward_valid'] = reward_valid
             info['reward_qed'] = reward_qed
