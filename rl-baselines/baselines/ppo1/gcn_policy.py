@@ -133,10 +133,8 @@ class GCNPolicy(object):
 
         ### 2 predict stop
         self.logits_stop = tf.reduce_sum(tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1'),axis=1)
-        self.logits_stop_yes = tf.layers.dense(self.logits_stop, 1, activation=None, name='linear_stop2_1')  # B*1
-        self.logits_stop_no = tf.layers.dense(self.logits_stop, 1, activation=None, name='linear_stop2_2')  # B*1
-        self.logits_stop = tf.concat((self.logits_stop_yes-3,self.logits_stop_no),axis=1)
-        pd_stop = CategoricalPdType(-1).pdfromflat(flat=self.logits_stop)
+        self.logits_stop = tf.layers.dense(self.logits_stop, 2, activation=None, name='linear_stop2_1')  # B*2
+        pd_stop = CategoricalPdType(-1).pdfromflat(flat=self.logits_stop+tf.constant([[0,-3]]))
         ac_stop = pd_stop.sample()
 
         ### 3.1: select first (active) node
