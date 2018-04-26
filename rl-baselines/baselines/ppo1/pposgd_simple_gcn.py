@@ -411,7 +411,7 @@ def learn(args,env, policy_fn, *,
                 # ob_adjs,ob_nodes=traj_final_generator(pi,env,optim_batchsize,True)
                 loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg["ob_adj_final"], seg["ob_node_final"])
                 adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
-                print(seg["ob_adj_final"].shape)
+                # print(seg["ob_adj_final"].shape)
                 # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
 

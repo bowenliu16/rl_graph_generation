@@ -40,7 +40,7 @@ def train(args,seed,writer=None):
 
     pposgd_simple_gcn.learn(args,env, policy_fn,
         max_timesteps=args.num_steps,
-        timesteps_per_actorbatch=64,
+        timesteps_per_actorbatch=256,
         clip_param=0.2, entcoeff=0.01,
         optim_epochs=4, optim_stepsize=1e-3, optim_batchsize=32,
         gamma=0.99, lam=0.95,

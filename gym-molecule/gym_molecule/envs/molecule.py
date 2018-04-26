@@ -78,7 +78,7 @@ class MoleculeEnv(gym.Env):
             self.max_atom = 13 + len(possible_atoms) # gdb 13
         elif data_type=='zinc':
             self.max_atom = 38 + len(possible_atoms) # ZINC
-        self.max_action = 200
+        self.max_action = 128
         self.logp_ratio = logp_ratio
         self.qed_ratio = qed_ratio
         self.sa_ratio = sa_ratio
