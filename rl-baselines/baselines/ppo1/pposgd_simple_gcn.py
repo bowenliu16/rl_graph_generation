@@ -358,13 +358,13 @@ def learn(args,env, policy_fn, *,
                 # saver = tf.train.Saver()
                 # saver.save(tf.get_default_session(), fname)
             # if iters_so_far==args.load_step:
-            try:
-                fname = 'ckpt/' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)
-                saver.restore(tf.get_default_session(), fname)
-                iters_so_far=int(fname.split('_')[-1])
-                print('model restored!',fname,'iters_so_far:',iters_so_far)
-            except:
-                print('ckpt not found, start with iters 0')
+        try:
+            fname = 'ckpt/' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)
+            saver.restore(tf.get_default_session(), fname)
+            iters_so_far=int(fname.split('_')[-1])
+            print('model restored!',fname,'iters_so_far:',iters_so_far)
+        except:
+            print('ckpt not found, start with iters 0')
 
 
         ## Expert
