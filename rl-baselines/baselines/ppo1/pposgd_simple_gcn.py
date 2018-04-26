@@ -93,12 +93,14 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
         if rew_env>0: # if action valid
             cur_ep_len_valid += 1
             # add stepwise discriminator reward
-            rew_d_step = args.gan_step_ratio * (
-                1 - d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0]) / env.max_atom
+            if args.has_d_step==1:
+                rew_d_step = args.gan_step_ratio * (
+                    1 - d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0]) / env.max_atom
         rew_d_final = 0 # default
         if new:
-            rew_d_final = args.gan_final_ratio * (
-                1 - d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0])
+            if args.has_d_final==1:
+                rew_d_final = args.gan_final_ratio * (
+                    1 - d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0])
 
         rews[i] = rew_d_step + rew_env +rew_d_final
 
@@ -419,19 +421,21 @@ def learn(args,env, policy_fn, *,
                     *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                     adam_pi.update(g_ppo, optim_stepsize * cur_lrmult)
                     losses_ppo.append(newlosses)
-                    # update step discriminator
-                    ob_expert, _ = env.get_expert(optim_batchsize)
-                    loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
-                    adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
-                    losses_d_step.append(loss_d_step)
+                    if args.has_d_step==1:
+                        # update step discriminator
+                        ob_expert, _ = env.get_expert(optim_batchsize)
+                        loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
+                        adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
+                        losses_d_step.append(loss_d_step)
                 loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)
-                # update final discriminator
-                ob_expert, _ = env.get_expert(optim_batchsize,is_final=True)
-                # ob_adjs,ob_nodes=traj_final_generator(pi,env,optim_batchsize,True)
-                loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg["ob_adj_final"], seg["ob_node_final"])
-                adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
-                # print(seg["ob_adj_final"].shape)
-                # logger.log(fmt_row(13, np.mean(losses, axis=0)))
+                if args.has_d_final==1:
+                    # update final discriminator
+                    ob_expert, _ = env.get_expert(optim_batchsize,is_final=True)
+                    # ob_adjs,ob_nodes=traj_final_generator(pi,env,optim_batchsize,True)
+                    loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg["ob_adj_final"], seg["ob_node_final"])
+                    adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
+                    # print(seg["ob_adj_final"].shape)
+                    # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
 
         ## PPO val

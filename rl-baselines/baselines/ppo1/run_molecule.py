@@ -40,7 +40,7 @@ def train(args,seed,writer=None):
 
     pposgd_simple_gcn.learn(args,env, policy_fn,
         max_timesteps=args.num_steps,
-        timesteps_per_actorbatch=128,
+        timesteps_per_actorbatch=256,
         clip_param=0.2, entcoeff=0.01,
         optim_epochs=4, optim_stepsize=1e-3, optim_batchsize=32,
         gamma=0.99, lam=0.95,
@@ -75,12 +75,14 @@ def molecule_arg_parser():
     parser.add_argument('--reward_step_total', type=float, default=1)
     # parser.add_argument('--has_rl', type=int, default=1)
     # parser.add_argument('--has_expert', type=int, default=1)
+    parser.add_argument('--has_d_step', type=int, default=1)
+    parser.add_argument('--has_d_final', type=int, default=1)
     parser.add_argument('--rl_start', type=int, default=500)
     parser.add_argument('--rl_end', type=int, default=int(1e6))
     parser.add_argument('--expert_start', type=int, default=0)
     parser.add_argument('--expert_end', type=int, default=500)
     parser.add_argument('--save_every', type=int, default=500)
-    parser.add_argument('--load_step', type=int, default=0)
+    parser.add_argument('--load_step', type=int, default=500)
 
 
 
