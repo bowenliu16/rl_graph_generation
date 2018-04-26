@@ -323,6 +323,15 @@ def learn(args,env, policy_fn, *,
 
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
+    if args.load==1:
+        try:
+            fname = 'ckpt/' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)
+            saver = tf.train.Saver(var_list_pi)
+            saver.restore(tf.get_default_session(), fname)
+            iters_so_far = int(fname.split('_')[-1])+1
+            print('model restored!', fname, 'iters_so_far:', iters_so_far)
+        except:
+            print(fname,'ckpt not found, start with iters 0')
 
     ## start training
     while True:
@@ -344,27 +353,7 @@ def learn(args,env, policy_fn, *,
             raise NotImplementedError
 
         # logger.log("********** Iteration %i ************"%iters_so_far)
-        if MPI.COMM_WORLD.Get_rank() == 0:
-            with open('molecule_gen/' + args.dataset+'_'+args.name + '.csv', 'a') as f:
-                f.write('***** Iteration {} *****\n'.format(iters_so_far))
-            # save
-            if iters_so_far % args.save_every == 0:
-                fname = 'ckpt/' + args.dataset + '_' + args.name + '_' + str(iters_so_far)
-                saver = tf.train.Saver(var_list_pi)
-                saver.save(tf.get_default_session(), fname)
-                print('model saved!',fname)
-                # fname = os.path.join(ckpt_dir, task_name)
-                # os.makedirs(os.path.dirname(fname), exist_ok=True)
-                # saver = tf.train.Saver()
-                # saver.save(tf.get_default_session(), fname)
-            # if iters_so_far==args.load_step:
-        try:
-            fname = 'ckpt/' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)
-            saver.restore(tf.get_default_session(), fname)
-            iters_so_far=int(fname.split('_')[-1])
-            print('model restored!',fname,'iters_so_far:',iters_so_far)
-        except:
-            print('ckpt not found, start with iters 0')
+
 
 
         ## Expert
@@ -510,6 +499,24 @@ def learn(args,env, policy_fn, *,
             writer.add_scalar("EpisodesSoFar", episodes_so_far, iters_so_far)
             writer.add_scalar("TimestepsSoFar", timesteps_so_far, iters_so_far)
             writer.add_scalar("TimeElapsed", time.time() - tstart, iters_so_far)
+
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            with open('molecule_gen/' + args.dataset+'_'+args.name + '.csv', 'a') as f:
+                f.write('***** Iteration {} *****\n'.format(iters_so_far))
+            # save
+            if iters_so_far % args.save_every == 0:
+                fname = 'ckpt/' + args.dataset + '_' + args.name + '_' + str(iters_so_far)+'.ckpt'
+                saver = tf.train.Saver(var_list_pi)
+                saver.save(tf.get_default_session(), fname)
+                print('model saved!',fname)
+                # fname = os.path.join(ckpt_dir, task_name)
+                # os.makedirs(os.path.dirname(fname), exist_ok=True)
+                # saver = tf.train.Saver()
+                # saver.save(tf.get_default_session(), fname)
+            # if iters_so_far==args.load_step:
+
+
         iters_so_far += 1
         # if MPI.COMM_WORLD.Get_rank()==0:
         #     logger.dump_tabular()

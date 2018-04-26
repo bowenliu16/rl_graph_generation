@@ -67,6 +67,7 @@ def molecule_arg_parser():
     parser.add_argument('--num_steps', type=int, default=int(2e7))
     parser.add_argument('--name', type=str, default='test')
     parser.add_argument('--name_load', type=str, default='gan2_rlstart500_expertend500')
+    # parser.add_argument('--name_load', type=str, default='test')
     parser.add_argument('--dataset', type=str, default='zinc')
     parser.add_argument('--dataset_load', type=str, default='zinc')
     parser.add_argument('--logp_ratio', type=float, default=1)
@@ -84,6 +85,7 @@ def molecule_arg_parser():
     parser.add_argument('--expert_start', type=int, default=0)
     parser.add_argument('--expert_end', type=int, default=500)
     parser.add_argument('--save_every', type=int, default=500)
+    parser.add_argument('--load', type=int, default=1)
     parser.add_argument('--load_step', type=int, default=500)
 
 
