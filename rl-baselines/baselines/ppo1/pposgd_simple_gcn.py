@@ -38,6 +38,8 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
     # obs = np.array([ob for _ in range(horizon)])
     ob_adjs = np.array([ob_adj for _ in range(horizon)])
     ob_nodes = np.array([ob_node for _ in range(horizon)])
+    ob_adjs_final = []
+    ob_nodes_final = []
     rews = np.zeros(horizon, 'float32')
     vpreds = np.zeros(horizon, 'float32')
     news = np.zeros(horizon, 'int32')
@@ -61,7 +63,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if t > 0 and t % horizon == 0:
-            yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes, "rew" : rews, "vpred" : vpreds, "new" : news,
+            yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes,"ob_adj_final" : np.array(ob_adjs_final), "ob_node_final" : np.array(ob_nodes_final), "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
                     "ep_rets" : ep_rets, "ep_lens" : ep_lens, "ep_lens_valid" : ep_lens_valid, "ep_final_rew":ep_rew_final,"ep_rets_env" : ep_rets_env,"ep_rets_d_step" : ep_rets_d_step,"ep_rets_d_final" : ep_rets_d_final}
             # Be careful!!! if you change the downstream algorithm to aggregate
@@ -73,6 +75,8 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
             ep_rets_d_step = []
             ep_rets_d_final = []
             ep_rets_env = []
+            ob_adjs_final = []
+            ob_nodes_final = []
 
         i = t % horizon
         # obs[i] = ob
@@ -107,6 +111,8 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
             with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
                 str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
                 f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'], info['reward_logp'], rew_env, rew_d_step, rew_d_final, cur_ep_ret, info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'], info['stop']))
+            ob_adjs_final.append(ob['adj'])
+            ob_nodes_final.append(ob['node'])
             ep_rets.append(cur_ep_ret)
             ep_rets_env.append(cur_ep_ret_env)
             ep_rets_d_step.append(cur_ep_ret_d_step)
@@ -403,8 +409,9 @@ def learn(args,env, policy_fn, *,
                 # update final discriminator
                 ob_expert, _ = env.get_expert(optim_batchsize,is_final=True)
                 # ob_adjs,ob_nodes=traj_final_generator(pi,env,optim_batchsize,True)
-                loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
+                loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg["ob_adj_final"], seg["ob_node_final"])
                 adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
+                print(seg["ob_adj_final"].shape)
                 # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
 
