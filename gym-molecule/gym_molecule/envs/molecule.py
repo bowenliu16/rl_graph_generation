@@ -100,6 +100,11 @@ class MoleculeEnv(gym.Env):
                                 '250k_rndm_zinc_drugs_clean.smi')  # ZINC
         self.dataset = gdb_dataset(path)
 
+        self.level = 0 # for curriculum learning, level starts with 0, and increase afterwards
+
+    def level_up(self):
+        self.level += 1
+
 
     #TODO(Bowen): The top try, except clause allows error messages from step
     # to be printed when running run_molecules.py. For debugging only
@@ -182,7 +187,10 @@ class MoleculeEnv(gym.Env):
 
             new = True # end of episode
             # reward = reward_step + reward_valid# + reward_qed + reward_sa + reward_logp
-            reward = reward_step + reward_valid + reward_logp
+            if self.level==0:
+                reward = reward_step + reward_valid
+            if self.level==1:
+                reward = reward_step + reward_valid + reward_logp
             info['smile'] = self.get_final_smiles()
             info['reward_valid'] = reward_valid
             info['reward_qed'] = reward_qed

@@ -32,6 +32,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
     ep_lens = [] # lengths of ...
     ep_lens_valid = [] # lengths of ...
     ep_rew_final = []
+    ep_rew_final_stat = []
 
 
 
@@ -66,13 +67,14 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
         if t > 0 and t % horizon == 0:
             yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes,"ob_adj_final" : np.array(ob_adjs_final), "ob_node_final" : np.array(ob_nodes_final), "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "ep_lens_valid" : ep_lens_valid, "ep_final_rew":ep_rew_final,"ep_rets_env" : ep_rets_env,"ep_rets_d_step" : ep_rets_d_step,"ep_rets_d_final" : ep_rets_d_final}
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "ep_lens_valid" : ep_lens_valid, "ep_final_rew":ep_rew_final, "ep_final_rew_stat":ep_rew_final_stat,"ep_rets_env" : ep_rets_env,"ep_rets_d_step" : ep_rets_d_step,"ep_rets_d_final" : ep_rets_d_final}
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
             ep_lens_valid = []
             ep_rew_final = []
+            ep_rew_final_stat = []
             ep_rets_d_step = []
             ep_rets_d_final = []
             ep_rets_env = []
@@ -123,6 +125,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
             ep_lens.append(cur_ep_len)
             ep_lens_valid.append(cur_ep_len_valid)
             ep_rew_final.append(rew_env)
+            ep_rew_final_stat.append(info['reward_logp'])
             cur_ep_ret = 0
             cur_ep_len = 0
             cur_ep_len_valid = 0
@@ -317,6 +320,7 @@ def learn(args,env, policy_fn, *,
     rewbuffer_d_step = deque(maxlen=100) # rolling buffer for episode rewards
     rewbuffer_d_final = deque(maxlen=100) # rolling buffer for episode rewards
     rewbuffer_final = deque(maxlen=100) # rolling buffer for episode rewards
+    rewbuffer_final_stat = deque(maxlen=100) # rolling buffer for episode rewards
 
 
     seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
@@ -468,9 +472,9 @@ def learn(args,env, policy_fn, *,
         # logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
         if writer is not None:
             writer.add_scalar("ev_tdlam_before", explained_variance(vpredbefore, tdlamret), iters_so_far)
-        lrlocal = (seg["ep_lens"],seg["ep_lens_valid"], seg["ep_rets"],seg["ep_rets_env"],seg["ep_rets_d_step"],seg["ep_rets_d_final"],seg["ep_final_rew"]) # local values
+        lrlocal = (seg["ep_lens"],seg["ep_lens_valid"], seg["ep_rets"],seg["ep_rets_env"],seg["ep_rets_d_step"],seg["ep_rets_d_final"],seg["ep_final_rew"],seg["ep_final_rew_stat"]) # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
-        lens, lens_valid, rews, rews_env, rews_d_step,rews_d_final, rews_final = map(flatten_lists, zip(*listoflrpairs))
+        lens, lens_valid, rews, rews_env, rews_d_step,rews_d_final, rews_final,rews_final_stat = map(flatten_lists, zip(*listoflrpairs))
         lenbuffer.extend(lens)
         lenbuffer_valid.extend(lens_valid)
         rewbuffer.extend(rews)
@@ -478,6 +482,7 @@ def learn(args,env, policy_fn, *,
         rewbuffer_d_final.extend(rews_d_final)
         rewbuffer_env.extend(rews_env)
         rewbuffer_final.extend(rews_final)
+        rewbuffer_final_stat.extend(rews_final_stat)
         # logger.record_tabular("EpLenMean", np.mean(lenbuffer))
         # logger.record_tabular("EpRewMean", np.mean(rewbuffer))
         # logger.record_tabular("EpThisIter", len(lens))
@@ -489,6 +494,7 @@ def learn(args,env, policy_fn, *,
             writer.add_scalar("EpRewDFinalMean", np.mean(rewbuffer_d_final), iters_so_far)
             writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env),iters_so_far)
             writer.add_scalar("EpRewFinalMean", np.mean(rewbuffer_final),iters_so_far)
+            writer.add_scalar("EpRewFinalStatMean", np.mean(rewbuffer_final_stat),iters_so_far)
             writer.add_scalar("EpThisIter", len(lens), iters_so_far)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
