@@ -480,7 +480,7 @@ class MoleculeEnv(gym.Env):
         return ob
 
 
-    def get_expert(self, batch_size,is_final=False):
+    def get_expert(self, batch_size,is_final=False,curriculum=False,level=0):
         ob = {}
         atom_type_num = len(self.possible_atom_types)
         bond_type_num = len(self.possible_bond_types)
