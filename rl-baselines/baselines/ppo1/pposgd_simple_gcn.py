@@ -329,7 +329,7 @@ def learn(args,env, policy_fn, *,
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
     if args.load==1:
         try:
-            fname = './ckpt/' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)
+            fname = './ckpt/' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)+'.ckpt'
             saver = tf.train.Saver(var_list_pi)
             saver.restore(tf.get_default_session(), fname)
             iters_so_far = int(fname.split('_')[-1])+1
