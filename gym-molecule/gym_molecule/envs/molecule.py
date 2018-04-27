@@ -480,7 +480,7 @@ class MoleculeEnv(gym.Env):
         return ob
 
 
-    def get_expert(self, batch_size,is_final=False,curriculum=False,level=0):
+    def get_expert(self, batch_size,is_final=False,curriculum=False,level_total=5,level=0):
         ob = {}
         atom_type_num = len(self.possible_atom_types)
         bond_type_num = len(self.possible_bond_types)
@@ -492,7 +492,13 @@ class MoleculeEnv(gym.Env):
         dataset_len = len(self.dataset)
         for i in range(batch_size):
             ### get a subgraph
+            # if curriculum:
+            #
+            # else:
             idx = np.random.randint(0, dataset_len)
+
+
+
             mol = self.dataset[idx]
             Chem.SanitizeMol(mol,sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
             graph = mol_to_nx(mol)
