@@ -522,14 +522,16 @@ def learn(args,env, policy_fn, *,
                 # saver = tf.train.Saver()
                 # saver.save(tf.get_default_session(), fname)
             # if iters_so_far==args.load_step:
-
-
         iters_so_far += 1
         counter += 1
         if args.curriculum==1:
-            if counter==args.curriculum1:
+            if iters_so_far%args.curriculum_step and iters_so_far//args.curriculum_step<args.curriculum_num:
                 env.level_up()
-        # if MPI.COMM_WORLD.Get_rank()==0:
+                # seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
+
+
+
+                # if MPI.COMM_WORLD.Get_rank()==0:
         #     logger.dump_tabular()
 
 

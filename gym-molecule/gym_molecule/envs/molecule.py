@@ -100,7 +100,7 @@ class MoleculeEnv(gym.Env):
                                 '250k_rndm_zinc_drugs_clean.smi')  # ZINC
         self.dataset = gdb_dataset(path)
 
-        self.level = 1 # for curriculum learning, level starts with 0, and increase afterwards
+        self.level = 0 # for curriculum learning, level starts with 0, and increase afterwards
 
     def level_up(self):
         self.level += 1
@@ -187,10 +187,10 @@ class MoleculeEnv(gym.Env):
 
             new = True # end of episode
             # reward = reward_step + reward_valid# + reward_qed + reward_sa + reward_logp
-            if self.level==0:
-                reward = reward_step + reward_valid
-            if self.level==1:
-                reward = reward_step + reward_valid + reward_logp
+            # if self.level==0:
+            #     reward = reward_step + reward_valid
+            # if self.level==1:
+            reward = reward_step + reward_valid + reward_logp
             info['smile'] = self.get_final_smiles()
             info['reward_valid'] = reward_valid
             info['reward_qed'] = reward_qed
@@ -490,10 +490,10 @@ class MoleculeEnv(gym.Env):
         ac = np.zeros((batch_size, 4))
         ### select molecule
         dataset_len = len(self.dataset)
-        np.random.randint(0,dataset_len,size=batch_size)
         for i in range(batch_size):
             ### get a subgraph
-            mol = self.dataset[i]
+            idx = np.random.randint(0, dataset_len)
+            mol = self.dataset[idx]
             Chem.SanitizeMol(mol,sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
             graph = mol_to_nx(mol)
             edges = graph.edges()
