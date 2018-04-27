@@ -330,8 +330,10 @@ def learn(args,env, policy_fn, *,
     if args.load==1:
         try:
             fname = './ckpt/' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)
+            sess = tf.get_default_session()
+            sess.run(tf.global_variables_initializer())
             saver = tf.train.Saver(var_list_pi)
-            saver.restore(tf.get_default_session(), fname)
+            saver.restore(sess, fname)
             iters_so_far = int(fname.split('_')[-1])+1
             print('model restored!', fname, 'iters_so_far:', iters_so_far)
         except:
