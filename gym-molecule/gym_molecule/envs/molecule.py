@@ -97,7 +97,7 @@ class MoleculeEnv(gym.Env):
                                 'gdb13.rand1M.smi.gz')  # gdb 13
         elif data_type=='zinc':
             path = os.path.join(os.path.dirname(cwd), 'dataset',
-                                '250k_rndm_zinc_drugs_clean.smi')  # ZINC
+                                '250k_rndm_zinc_drugs_clean_sorted.smi')  # ZINC
         self.dataset = gdb_dataset(path)
 
         self.level = 0 # for curriculum learning, level starts with 0, and increase afterwards
@@ -480,7 +480,7 @@ class MoleculeEnv(gym.Env):
         return ob
 
 
-    def get_expert(self, batch_size,is_final=False,curriculum=False,level_total=5,level=0):
+    def get_expert(self, batch_size,is_final=False,curriculum=0,level_total=6,level=0):
         ob = {}
         atom_type_num = len(self.possible_atom_types)
         bond_type_num = len(self.possible_bond_types)
@@ -492,10 +492,10 @@ class MoleculeEnv(gym.Env):
         dataset_len = len(self.dataset)
         for i in range(batch_size):
             ### get a subgraph
-            if curriculum:
+            if curriculum==1:
                 ratio_start = level/float(level_total)
                 ratio_end = (level+1)/float(level_total)
-                idx = np.random.randint(int(ratio_start*dataset_len), int(ratio_end,dataset_len))
+                idx = np.random.randint(int(ratio_start*dataset_len), int(ratio_end*dataset_len))
             else:
                 idx = np.random.randint(0, dataset_len)
             mol = self.dataset[idx]

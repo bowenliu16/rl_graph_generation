@@ -320,7 +320,7 @@ def learn(args,env, policy_fn, *,
     rewbuffer_d_step = deque(maxlen=100) # rolling buffer for episode rewards
     rewbuffer_d_final = deque(maxlen=100) # rolling buffer for episode rewards
     rewbuffer_final = deque(maxlen=100) # rolling buffer for episode rewards
-    rewbuffer_final_stat = deque(maxlen=100) # rolling buffer for episode rewards
+    rewbuffer_final_stat = deque(maxlen=100) # rolling buffer for episode rewardsn
 
 
     seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
@@ -340,6 +340,7 @@ def learn(args,env, policy_fn, *,
             print(fname,'ckpt not found, start with iters 0')
 
     counter = 0
+    level = 0
     ## start training
     while True:
         if callback: callback(locals(), globals())
@@ -419,7 +420,7 @@ def learn(args,env, policy_fn, *,
                     losses_ppo.append(newlosses)
                     if args.has_d_step==1:
                         # update step discriminator
-                        ob_expert, _ = env.get_expert(optim_batchsize)
+                        ob_expert, _ = env.get_expert(optim_batchsize,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
                         loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
                         adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
                         losses_d_step.append(loss_d_step)
@@ -526,10 +527,9 @@ def learn(args,env, policy_fn, *,
             # if iters_so_far==args.load_step:
         iters_so_far += 1
         counter += 1
-        if args.curriculum==1:
-            if iters_so_far%args.curriculum_step and iters_so_far//args.curriculum_step<args.curriculum_num:
-                env.level_up()
-                # seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
+        if counter%args.curriculum_step and counter//args.curriculum_step<args.curriculum_num:
+            level += 1
+            # seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
 
 
 

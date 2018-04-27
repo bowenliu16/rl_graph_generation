@@ -90,7 +90,7 @@ def molecule_arg_parser():
     # parser.add_argument('--load_step', type=int, default=0)
     parser.add_argument('--curriculum', type=int, default=0)
     parser.add_argument('--curriculum_num', type=int, default=6)
-    parser.add_argument('--curriculum_step', type=int, default=100)
+    parser.add_argument('--curriculum_step', type=int, default=200)
 
 
 
