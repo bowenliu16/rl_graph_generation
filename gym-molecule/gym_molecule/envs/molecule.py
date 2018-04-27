@@ -100,7 +100,7 @@ class MoleculeEnv(gym.Env):
                                 '250k_rndm_zinc_drugs_clean.smi')  # ZINC
         self.dataset = gdb_dataset(path)
 
-        self.level = 0 # for curriculum learning, level starts with 0, and increase afterwards
+        self.level = 1 # for curriculum learning, level starts with 0, and increase afterwards
 
     def level_up(self):
         self.level += 1
