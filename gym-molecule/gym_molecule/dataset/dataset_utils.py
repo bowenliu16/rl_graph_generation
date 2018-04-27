@@ -2,8 +2,9 @@ __author__ = "Bowen Liu"
 __copyright__ = "Copyright 2018, Stanford University"
 
 import pandas as pd
-from rdkit import Chem
 import networkx as nx
+from rdkit import Chem
+from rdkit.Chem import GraphDescriptors
 import numpy as np
 
 def mol_to_nx(mol):
@@ -62,6 +63,22 @@ def load_dataset(path):
   """
   df = pd.read_csv(path, header=None, names=['smiles'])
   return df
+
+def sort_dataset(in_path, out_path):
+    """
+    Sorts the dataset of smiles from input path by molecular complexity as
+    proxied by the BertzCT index, and outputs the new sorted dataset
+    :param in_path:
+    :param out_path:
+    :return:
+    """
+    def _calc_bertz_ct(smiles):
+        return GraphDescriptors.BertzCT(Chem.MolFromSmiles(smiles))
+
+    in_df = load_dataset(in_path)
+    in_df['BertzCT'] = in_df.smiles.apply(_calc_bertz_ct)
+    sorted_df = in_df.sort_values(by=['BertzCT'])
+    sorted_df['smiles'].to_csv(out_path, index=False)
 
 class gdb_dataset:
   """
