@@ -427,7 +427,7 @@ def learn(args,env, policy_fn, *,
                 loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)
                 if args.has_d_final==1:
                     # update final discriminator
-                    ob_expert, _ = env.get_expert(optim_batchsize,is_final=True)
+                    ob_expert, _ = env.get_expert(optim_batchsize,is_final=True,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
                     # ob_adjs,ob_nodes=traj_final_generator(pi,env,optim_batchsize,True)
                     loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg["ob_adj_final"], seg["ob_node_final"])
                     adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
