@@ -64,9 +64,9 @@ def molecule_arg_parser():
     parser.add_argument('--env', help='environment ID',
                         default='BreakoutNoFrameskip-v4')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--num_steps', type=int, default=int(2e7))
+    parser.add_argument('--num_steps', type=int, default=int(5e7))
     parser.add_argument('--name', type=str, default='test')
-    parser.add_argument('--name_load', type=str, default='expert_pretrain_new')
+    parser.add_argument('--name_load', type=str, default='new_expert_correct')
     # parser.add_argument('--name_load', type=str, default='test')
     parser.add_argument('--dataset', type=str, default='zinc')
     parser.add_argument('--dataset_load', type=str, default='zinc')

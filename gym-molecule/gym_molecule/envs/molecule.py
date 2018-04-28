@@ -552,7 +552,7 @@ class MoleculeEnv(gym.Env):
                 float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
                 assert float_array.sum() != 0
                 ob['node'][i, 0, node_id, :] = float_array
-                print('node',node_id)
+                # print('node',node_id)
             ob['node'][i ,0, n:n + atom_type_num, :] = np.eye(atom_type_num)
 
             for j in range(bond_type_num):
@@ -565,7 +565,7 @@ class MoleculeEnv(gym.Env):
                 assert float_array.sum() != 0
                 ob['adj'][i, :, begin_idx, end_idx] = float_array
                 ob['adj'][i, :, end_idx, begin_idx] = float_array
-                print('edge',begin_idx,end_idx)
+                # print('edge',begin_idx,end_idx)
 
         return ob,ac
 
