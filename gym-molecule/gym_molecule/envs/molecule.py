@@ -540,6 +540,7 @@ class MoleculeEnv(gym.Env):
                     print('Expert policy error!')
                 edge_type = np.argmax(graph[edge_sample[0]][edge_sample[1]]['bond_type'] == self.possible_bond_types)
                 ac[i,:] = [node1,node2,edge_type,0] # don't stop
+                print('action',[node1,node2,edge_type,0])
             # print('action',ac)
             # plt.axis("off")
             # nx.draw_networkx(graph_sub)
@@ -550,21 +551,22 @@ class MoleculeEnv(gym.Env):
                 float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
                 assert float_array.sum() != 0
                 ob['node'][i, 0, node_id, :] = float_array
+                print('node',node_id)
             ob['node'][i ,0, n:n + atom_type_num, :] = np.eye(atom_type_num)
 
             for j in range(bond_type_num):
                 ob['adj'][i, j, :n + atom_type_num, :n + atom_type_num] = np.eye(n + atom_type_num)
             for edge in graph_sub.edges():
-                begin_idx = edge[0]
-                end_idx = edge[1]
-                bond_type = graph[begin_idx][end_idx]['bond_type']
+                begin_idx = graph_sub.nodes().index(edge[0])
+                end_idx = graph_sub.nodes().index(edge[1])
+                bond_type = graph[edge[0]][edge[1]]['bond_type']
                 float_array = (bond_type == self.possible_bond_types).astype(float)
                 assert float_array.sum() != 0
                 ob['adj'][i, :, begin_idx, end_idx] = float_array
                 ob['adj'][i, :, end_idx, begin_idx] = float_array
+                print('edge',begin_idx,end_idx)
 
         return ob,ac
-
 
 ### YES/NO filters ###
 def zinc_molecule_filter(mol):
@@ -992,8 +994,13 @@ if __name__ == '__main__':
     # print(ob['adj'].shape)
     # print(ob['node'].shape)
     #
-    # ob,ac = env.get_expert(4)
-    # print(ob)
+    ob,ac = env.get_expert(10)
+    # print('node')
+    # for i in range(ob['node'].shape[2]):
+    #     print(ob['node'][0,0,i])
+    # print('adj')
+    # for i in range(ob['adj'].shape[2]):
+    #     print(ob['adj'][0, 0, i])
     # print(ac)
 
     # atom_list = []
@@ -1004,7 +1011,7 @@ if __name__ == '__main__':
     # print(max(atom_list),max(bond_list))
 
 
-    print(reward_penalized_log_p(Chem.MolFromSmiles('O=C1OC(F)=C(F)C(N2C(O)=C2C2CC2)=C1Cl')))
+    # print(reward_penalized_log_p(Chem.MolFromSmiles('O=C1OC(F)=C(F)C(N2C(O)=C2C2CC2)=C1Cl')))
     # env.get_expert(4)
 
     # env.step(np.array([[0,3,0]]))
