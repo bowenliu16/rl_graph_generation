@@ -301,10 +301,6 @@ def learn(args,env, policy_fn, *,
     #                                 loss_expert)
     compute_losses = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses)
 
-    U.initialize()
-    adam_pi.sync()
-    adam_d_step.sync()
-    adam_d_final.sync()
 
 
     # Prepare for rollouts
@@ -338,6 +334,11 @@ def learn(args,env, policy_fn, *,
             print('model restored!', fname, 'iters_so_far:', iters_so_far)
         except:
             print(fname,'ckpt not found, start with iters 0')
+
+    U.initialize()
+    adam_pi.sync()
+    adam_d_step.sync()
+    adam_d_final.sync()
 
     counter = 0
     level = 0

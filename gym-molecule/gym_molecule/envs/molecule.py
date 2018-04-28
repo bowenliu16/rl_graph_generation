@@ -541,7 +541,7 @@ class MoleculeEnv(gym.Env):
                     print('Expert policy error!')
                 edge_type = np.argmax(graph[edge_sample[0]][edge_sample[1]]['bond_type'] == self.possible_bond_types)
                 ac[i,:] = [node1,node2,edge_type,0] # don't stop
-                print('action',[node1,node2,edge_type,0])
+                # print('action',[node1,node2,edge_type,0])
             # print('action',ac)
             # plt.axis("off")
             # nx.draw_networkx(graph_sub)
