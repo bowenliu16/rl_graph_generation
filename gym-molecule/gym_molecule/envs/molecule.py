@@ -498,7 +498,8 @@ class MoleculeEnv(gym.Env):
                 idx = np.random.randint(int(ratio_start*dataset_len), int(ratio_end*dataset_len))
             else:
                 idx = np.random.randint(0, dataset_len)
-            mol = self.dataset[idx]
+            # mol = self.dataset[idx]
+            mol = self.dataset[i] # sanitity check
             Chem.SanitizeMol(mol,sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
             graph = mol_to_nx(mol)
             edges = graph.edges()
