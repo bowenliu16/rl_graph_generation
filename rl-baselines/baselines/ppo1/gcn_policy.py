@@ -116,6 +116,8 @@ class GCNPolicy(object):
               'node': U.get_placeholder(name="node", dtype=tf.float32, shape=[None,1,None,ob_space['node'].shape[2]])}
         # only when evaluating given action, at training time
         self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,4]) # feed groudtruth action
+        # normalize adj
+
         if kind == 'small':
             ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
             self.emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1')

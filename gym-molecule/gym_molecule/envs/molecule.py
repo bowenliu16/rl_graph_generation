@@ -56,11 +56,11 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         pass
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=True):
         '''
         own init function, since gym does not support passing argument
         '''
-
+        self.is_normalize = is_normalize
         self.mol = Chem.RWMol()
         self.smile_list = []
         if data_type=='gdb':
@@ -105,6 +105,15 @@ class MoleculeEnv(gym.Env):
     def level_up(self):
         self.level += 1
 
+    def normalize_adj(self,adj):
+        degrees = np.sum(adj,axis=2)
+        # print('degrees',degrees)
+        D = np.zeros((adj.shape[0],adj.shape[1],adj.shape[2]))
+        for i in range(D.shape[0]):
+            D[i,:,:] = np.diag(np.power(degrees[i,:],-0.5))
+        adj_normal = D@adj@D
+        adj_normal[np.isnan(adj_normal)]=0
+        return adj_normal
 
     #TODO(Bowen): The top try, except clause allows error messages from step
     # to be printed when running run_molecules.py. For debugging only
@@ -475,6 +484,8 @@ class MoleculeEnv(gym.Env):
             E[:, begin_idx, end_idx] = float_array
             E[:, end_idx, begin_idx] = float_array
         ob = {}
+        if self.is_normalize:
+            E = self.normalize_adj(E)
         ob['adj'] = E
         ob['node'] = F
         return ob
@@ -566,6 +577,8 @@ class MoleculeEnv(gym.Env):
                 ob['adj'][i, :, begin_idx, end_idx] = float_array
                 ob['adj'][i, :, end_idx, begin_idx] = float_array
                 # print('edge',begin_idx,end_idx)
+            if self.is_normalize:
+                ob['adj'] = self.normalize_adj(ob['adj'])
 
         return ob,ac
 
@@ -990,12 +1003,19 @@ if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
     env.init()
 
+
     ob = env.reset()
 
     # print(ob['adj'].shape)
     # print(ob['node'].shape)
     #
     ob,ac = env.get_expert(10)
+    ob_norm = env.normalize_adj(ob['adj'][0])
+    np.set_printoptions(precision=2,linewidth=200)
+    for i in range(ob_norm.shape[-1]):
+        print(ob_norm[0][i])
+
+
     # print('node')
     # for i in range(ob['node'].shape[2]):
     #     print(ob['node'][0,0,i])
