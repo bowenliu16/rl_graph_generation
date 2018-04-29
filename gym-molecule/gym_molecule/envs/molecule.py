@@ -578,7 +578,7 @@ class MoleculeEnv(gym.Env):
                 ob['adj'][i, :, end_idx, begin_idx] = float_array
                 # print('edge',begin_idx,end_idx)
             if self.is_normalize:
-                ob['adj'] = self.normalize_adj(ob['adj'])
+                ob['adj'][i] = self.normalize_adj(ob['adj'][i])
 
         return ob,ac
 
@@ -1010,10 +1010,11 @@ if __name__ == '__main__':
     # print(ob['node'].shape)
     #
     ob,ac = env.get_expert(10)
-    ob_norm = env.normalize_adj(ob['adj'][0])
     np.set_printoptions(precision=2,linewidth=200)
-    for i in range(ob_norm.shape[-1]):
-        print(ob_norm[0][i])
+    # for j in range(10):
+    #     print('-------------------------------')
+    #     for i in range(ob['adj'].shape[-1]):
+    #         print(ob['adj'][j,0][i])
 
 
     # print('node')
