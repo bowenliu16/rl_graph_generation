@@ -374,7 +374,7 @@ def learn(args,env, policy_fn, *,
             ## Expert train
             losses = []  # list of tuples, each of which gives the loss for a minibatch
             losses_stop = []  # list of tuples, each of which gives the loss for a minibatch
-            for _ in range(optim_epochs*2):
+            for _ in range(optim_epochs*args.supervise_time):
                 ob_expert, ac_expert = env.get_expert(optim_batchsize)
                 losses_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
                 adam_pi.update(g_expert, optim_stepsize * cur_lrmult)
