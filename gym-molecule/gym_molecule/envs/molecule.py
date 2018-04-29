@@ -56,11 +56,11 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         pass
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=True):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0):
         '''
         own init function, since gym does not support passing argument
         '''
-        self.is_normalize = is_normalize
+        self.is_normalize = bool(is_normalize)
         self.mol = Chem.RWMol()
         self.smile_list = []
         if data_type=='gdb':

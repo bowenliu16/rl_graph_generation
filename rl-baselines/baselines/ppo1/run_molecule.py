@@ -26,11 +26,11 @@ def train(args,seed,writer=None):
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
     env = gym.make('molecule-v0')
-    env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total) # remember call this after gym.make!!
+    env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize) # remember call this after gym.make!!
     print(env.observation_space)
     def policy_fn(name, ob_space, ac_space): #pylint: disable=W0613
         # return cnn_policy.CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
-        return gcn_policy.GCNPolicy(name=name, ob_space=ob_space, ac_space=ac_space, atom_type_num=env.atom_type_num)
+        return gcn_policy.GCNPolicy(name=name, ob_space=ob_space, ac_space=ac_space, atom_type_num=env.atom_type_num,args=args)
     # env = bench.Monitor(env, logger.get_dir() and
     #     osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)
@@ -92,6 +92,9 @@ def molecule_arg_parser():
     parser.add_argument('--curriculum_num', type=int, default=6)
     parser.add_argument('--curriculum_step', type=int, default=200)
     parser.add_argument('--supervise_time', type=int, default=2)
+    parser.add_argument('--normalize', type=int, default=0)
+    parser.add_argument('--layer_num', type=int, default=3)
+    parser.add_argument('--graph_emb', type=int, default=1)
 
 
 

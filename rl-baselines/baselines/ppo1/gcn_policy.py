@@ -104,26 +104,30 @@ def discriminator(x,x_gen,name='d_net'):
 
 class GCNPolicy(object):
     recurrent = False
-    def __init__(self, name, ob_space, ac_space, kind='small', atom_type_num = None):
+    def __init__(self, name, ob_space, ac_space,args, kind='small', atom_type_num = None):
         with tf.variable_scope(name):
-            self._init(ob_space, ac_space, kind, atom_type_num)
+            self._init(ob_space, ac_space, kind, atom_type_num,args)
             self.scope = tf.get_variable_scope().name
 
-    def _init(self, ob_space, ac_space, kind, atom_type_num):
+    def _init(self, ob_space, ac_space, kind, atom_type_num,args):
         self.pdtype = MultiCatCategoricalPdType
         ### 0 Get input
         ob = {'adj': U.get_placeholder(name="adj", dtype=tf.float32, shape=[None,ob_space['adj'].shape[0],None,None]),
               'node': U.get_placeholder(name="node", dtype=tf.float32, shape=[None,1,None,ob_space['node'].shape[2]])}
         # only when evaluating given action, at training time
         self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,4]) # feed groudtruth action
-        # normalize adj
-
         if kind == 'small':
             ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
             self.emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1')
-            self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, 32, name='gcn1_1')
+            for i in range(args.layer_num-2):
+                self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, 32, name='gcn1_'+str(i+1))
             self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, 32, is_act=False, is_normalize=True, name='gcn2')
             emb_node = tf.squeeze(self.emb_node2,axis=1)  # B*n*f
+            emb_graph = tf.reduce_max(emb_node,axis=1,keepdims=True)
+            if args.graph_emb==1:
+                emb_graph = tf.tile(emb_graph, [1, tf.shape(emb_node)[1], 1])
+                emb_node = tf.concat([emb_node,emb_graph],axis=2)
+
         else:
             raise NotImplementedError
 
