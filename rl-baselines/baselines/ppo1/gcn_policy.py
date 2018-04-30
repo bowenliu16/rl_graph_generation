@@ -31,7 +31,7 @@ def GCN(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='
         return node_embedding
 
 # gcn mean aggregation over edge features
-def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='gcn_simple',aggregate='concat'):
+def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='gcn_simple',aggregate='mean'):
     '''
     state s: (adj,node_feature)
     :param adj: none*b*n*n
