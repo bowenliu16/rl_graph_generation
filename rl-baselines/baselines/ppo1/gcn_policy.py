@@ -145,7 +145,8 @@ class GCNPolicy(object):
         # self.logits_stop = tf.concat((tf.reduce_mean(tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1'),axis=1),tf.reshape(ob_len_first/5,[-1,1])),axis=1)
         # self.logits_stop = tf.layers.dense(self.logits_stop, 2, activation=None, name='linear_stop2')  # B*2
 
-        pd_stop = CategoricalPdType(-1).pdfromflat(flat=self.logits_stop+tf.constant([[0,-3]],dtype=tf.float32))
+        stop_shift = tf.constant([[0,args.stop_shift]],dtype=tf.float32)
+        pd_stop = CategoricalPdType(-1).pdfromflat(flat=self.logits_stop+stop_shift)
         ac_stop = pd_stop.sample()
 
         ### 3.1: select first (active) node

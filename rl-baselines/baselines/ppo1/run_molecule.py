@@ -95,6 +95,8 @@ def molecule_arg_parser():
     parser.add_argument('--normalize', type=int, default=0)
     parser.add_argument('--layer_num', type=int, default=3)
     parser.add_argument('--graph_emb', type=int, default=1)
+    parser.add_argument('--stop_shift', type=int, default=-3)
+
 
 
 
