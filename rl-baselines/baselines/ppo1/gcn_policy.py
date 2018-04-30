@@ -31,7 +31,7 @@ def GCN(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='
         return node_embedding
 
 # gcn mean aggregation over edge features
-def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='gcn_simple'):
+def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='gcn_simple',aggregate='concat'):
     '''
     state s: (adj,node_feature)
     :param adj: none*b*n*n
@@ -51,7 +51,12 @@ def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, 
         if is_act:
             node_embedding = tf.nn.relu(node_embedding)
         # todo: try complex aggregation
-        node_embedding = tf.reduce_mean(node_embedding,axis=1,keepdims=True) # mean pooling
+        if aggregate=='mean':
+            node_embedding = tf.reduce_mean(node_embedding,axis=1,keepdims=True) # mean pooling
+        elif aggregate=='concat':
+            node_embedding = tf.concat(tf.split(node_embedding,axis=1,num_or_size_splits=edge_dim),axis=3)
+        else:
+            print('GCN aggregate error!')
         if is_normalize:
             node_embedding = tf.nn.l2_normalize(node_embedding,axis=-1)
         return node_embedding
