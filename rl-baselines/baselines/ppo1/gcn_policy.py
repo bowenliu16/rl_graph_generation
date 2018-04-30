@@ -123,13 +123,13 @@ class GCNPolicy(object):
         self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,4]) # feed groudtruth action
         if kind == 'small':
             ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
-            self.emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1')
+            self.emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1')
             for i in range(args.layer_num-2):
                 if args.has_residual==1:
-                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, 32, name='gcn1_'+str(i+1))+self.emb_node1
+                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1))+self.emb_node1
                 else:
-                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, 32, name='gcn1_' + str(i + 1))
-            self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, 32, is_act=False, is_normalize=True, name='gcn2')
+                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_' + str(i + 1))
+            self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn2')
             emb_node = tf.squeeze(self.emb_node2,axis=1)  # B*n*f
             emb_graph = tf.reduce_max(emb_node,axis=1,keepdims=True)
             if args.graph_emb==1:
@@ -147,7 +147,7 @@ class GCNPolicy(object):
         logits_first_mask = tf.sequence_mask(ob_len_first,maxlen=tf.shape(ob['node'])[2]) # mask valid entry -3 (rm isolated nodes)
 
         ### 2 predict stop
-        self.logits_stop = tf.reduce_sum(tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1'),axis=1)
+        self.logits_stop = tf.reduce_sum(tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_stop1'),axis=1)
         self.logits_stop = tf.layers.dense(self.logits_stop, 2, activation=None, name='linear_stop2_1')  # B*2
         # explicitly show node num
         # self.logits_stop = tf.concat((tf.reduce_mean(tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1'),axis=1),tf.reshape(ob_len_first/5,[-1,1])),axis=1)
@@ -159,7 +159,7 @@ class GCNPolicy(object):
 
         ### 3.1: select first (active) node
         # rules: only select effective nodes
-        self.logits_first = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_select1')
+        self.logits_first = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_select1')
         self.logits_first = tf.squeeze(tf.layers.dense(self.logits_first, 1, activation=None, name='linear_select2'),axis=-1) # B*n
         logits_first_null = tf.ones(tf.shape(self.logits_first))*-1000
         self.logits_first = tf.where(condition=logits_first_mask,x=self.logits_first,y=logits_first_null)
@@ -181,7 +181,7 @@ class GCNPolicy(object):
 
         # mlp
         emb_cat = tf.concat([tf.tile(emb_first,[1,tf.shape(emb_node)[1],1]),emb_node],axis=2)
-        self.logits_second = tf.layers.dense(emb_cat, 32, activation=tf.nn.relu, name='logits_second1')
+        self.logits_second = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_second1')
         self.logits_second = tf.layers.dense(self.logits_second, 1, activation=None, name='logits_second2')
         # # bilinear
         # self.logits_second = tf.transpose(bilinear(emb_first, emb_node, name='logits_second'), [0, 2, 1])
@@ -201,7 +201,7 @@ class GCNPolicy(object):
         # using groudtruth
         # mlp
         emb_cat = tf.concat([tf.tile(emb_first_real, [1, tf.shape(emb_node)[1], 1]), emb_node], axis=2)
-        self.logits_second_real = tf.layers.dense(emb_cat, 32, activation=tf.nn.relu, name='logits_second1',reuse=True)
+        self.logits_second_real = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_second1',reuse=True)
         self.logits_second_real = tf.layers.dense(self.logits_second_real, 1, activation=None, name='logits_second2',reuse=True)
         # # bilinear
         # self.logits_second_real = tf.transpose(bilinear(emb_first_real, emb_node, name='logits_second'), [0, 2, 1])
@@ -220,7 +220,7 @@ class GCNPolicy(object):
         # using own prediction
         # MLP
         emb_cat = tf.concat([emb_first,emb_second],axis=-1)
-        self.logits_edge = tf.layers.dense(emb_cat, 32, activation=tf.nn.relu, name='logits_edge1')
+        self.logits_edge = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_edge1')
         self.logits_edge = tf.layers.dense(self.logits_edge, ob['adj'].get_shape()[1], activation=None, name='logits_edge2')
         self.logits_edge = tf.squeeze(self.logits_edge,axis=1)
         # # bilinear
@@ -231,7 +231,7 @@ class GCNPolicy(object):
         # using ground truth
         # MLP
         emb_cat = tf.concat([emb_first, emb_second], axis=-1)
-        self.logits_edge_real = tf.layers.dense(emb_cat, 32, activation=tf.nn.relu, name='logits_edge1', reuse=True)
+        self.logits_edge_real = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_edge1', reuse=True)
         self.logits_edge_real = tf.layers.dense(self.logits_edge_real, ob['adj'].get_shape()[1], activation=None,
                                            name='logits_edge2', reuse=True)
         self.logits_edge_real = tf.squeeze(self.logits_edge_real, axis=1)
@@ -242,7 +242,7 @@ class GCNPolicy(object):
 
         # ncat_list = [tf.shape(logits_first),ob_space['adj'].shape[-1],ob_space['adj'].shape[0]]
         self.pd = self.pdtype(-1).pdfromflat([self.logits_first,self.logits_second_real,self.logits_edge_real,self.logits_stop])
-        self.vpred = tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='value1')
+        self.vpred = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='value1')
         self.vpred = tf.layers.dense(self.vpred, 1, activation=None, name='value2')
         self.vpred = tf.reduce_max(self.vpred,axis=1)
 
