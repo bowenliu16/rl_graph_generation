@@ -502,7 +502,7 @@ class MoleculeEnv(gym.Env):
         ### select molecule
         dataset_len = len(self.dataset)
         for i in range(batch_size):
-            print('--------------------------------------------------')
+            # print('--------------------------------------------------')
             ### get a subgraph
             if curriculum==1:
                 ratio_start = level/float(level_total)
@@ -556,7 +556,7 @@ class MoleculeEnv(gym.Env):
                     print('Expert policy error!')
                 edge_type = np.argmax(graph[edge_sample[0]][edge_sample[1]]['bond_type'] == self.possible_bond_types)
                 ac[i,:] = [node1,node2,edge_type,0] # don't stop
-                print('action',[node1,node2,edge_type,0])
+                # print('action',[node1,node2,edge_type,0])
             # print('action',ac)
             # plt.axis("off")
             # nx.draw_networkx(graph_sub)
@@ -568,8 +568,8 @@ class MoleculeEnv(gym.Env):
                 float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
                 assert float_array.sum() != 0
                 ob['node'][i, 0, node_id, :] = float_array
-                print('node',node_id,graph.node[node]['symbol'])
-                atom = Chem.Atom(graph.node[node]['symbol'])
+                # print('node',node_id,graph.node[node]['symbol'])
+                # atom = Chem.Atom(graph.node[node]['symbol'])
                 # rw_mol.AddAtom(atom)
             ob['node'][i ,0, n:n + atom_type_num, :] = np.eye(atom_type_num)
 
@@ -583,7 +583,7 @@ class MoleculeEnv(gym.Env):
                 assert float_array.sum() != 0
                 ob['adj'][i, :, begin_idx, end_idx] = float_array
                 ob['adj'][i, :, end_idx, begin_idx] = float_array
-                print('edge',begin_idx,end_idx,bond_type)
+                # print('edge',begin_idx,end_idx,bond_type)
                 # rw_mol.AddBond(begin_idx, end_idx, order=bond_type)
             if self.is_normalize:
                 ob['adj'][i] = self.normalize_adj(ob['adj'][i])
