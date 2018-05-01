@@ -31,7 +31,7 @@ def GCN(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='
         return node_embedding
 
 # gcn mean aggregation over edge features
-def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='gcn_simple',aggregate='mean'):
+def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='gcn_simple',aggregate='sum'):
     '''
     state s: (adj,node_feature)
     :param adj: none*b*n*n
@@ -50,8 +50,9 @@ def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, 
         node_embedding = adj@tf.tile(node_feature,[1,edge_dim,1,1])@tf.tile(W,[batch_size,1,1,1])+b # todo: tf.tile sum the gradients, may need to change
         if is_act:
             node_embedding = tf.nn.relu(node_embedding)
-        # todo: try complex aggregation
-        if aggregate=='mean':
+        if aggregate == 'sum':
+            node_embedding = tf.reduce_sum(node_embedding, axis=1, keepdims=True)  # mean pooling
+        elif aggregate=='mean':
             node_embedding = tf.reduce_mean(node_embedding,axis=1,keepdims=True) # mean pooling
         elif aggregate=='concat':
             node_embedding = tf.concat(tf.split(node_embedding,axis=1,num_or_size_splits=edge_dim),axis=3)
@@ -60,6 +61,40 @@ def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, 
         if is_normalize:
             node_embedding = tf.nn.l2_normalize(node_embedding,axis=-1)
         return node_embedding
+
+# # gcn mean aggregation over edge features
+# def GCN_multihop_batch(adj, node_feature, out_channels, hops, is_act=True, is_normalize=False, name='gcn_simple',aggregate='mean'):
+#     '''
+#     state s: (adj,node_feature)
+#     :param adj: none*b*n*n
+#     :param node_feature: none*1*n*d
+#     :param out_channels: scalar
+#     :param name:
+#     :return:
+#     '''
+#     edge_dim = adj.get_shape()[1]
+#     batch_size = tf.shape(adj)[0]
+#     in_channels = node_feature.get_shape()[-1]
+#
+#     with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
+#         node_embedding_list = []
+#         for i in range(hops):
+#             W = tf.get_variable("W"+str(i), [1, edge_dim, in_channels, out_channels],initializer=tf.glorot_uniform_initializer())
+#             b = tf.get_variable("b"+str(i), [1, edge_dim, 1, out_channels])
+#             node_embedding = adj@tf.tile(node_feature,[1,edge_dim,1,1])@tf.tile(W,[batch_size,1,1,1])+b # todo: tf.tile sum the gradients, may need to change
+#             if is_act:
+#                 node_embedding = tf.nn.relu(node_embedding)
+#             if aggregate=='mean':
+#                 node_embedding = tf.reduce_mean(node_embedding,axis=1,keepdims=True) # mean pooling
+#             elif aggregate=='concat':
+#                 node_embedding = tf.concat(tf.split(node_embedding,axis=1,num_or_size_splits=edge_dim),axis=3)
+#             else:
+#                 print('GCN aggregate error!')
+#             if is_normalize:
+#                 node_embedding = tf.nn.l2_normalize(node_embedding,axis=-1)
+#             node_embedding_list.append(node_embedding)
+#         node_embedding = tf.concat(node_embedding_list,axis=-1)
+#         return node_embedding
 
 def bilinear(emb_1, emb_2, name='bilinear'):
     node_dim = emb_1.get_shape()[-1]
@@ -85,19 +120,19 @@ def emb_node(ob_node,out_channels):
     return ob_node @ tf.tile(emb,[batch_size,1,1,1])
 
 
-def discriminator_net(ob, name='d_net'):
+def discriminator_net(ob,args,name='d_net'):
     with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
         ob_node = tf.layers.dense(ob['node'], 8, activation=None, use_bias=False, name='emb')  # embedding layer
-        emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1')
-        emb_node2 = GCN_batch(ob['adj'], emb_node1, 32, is_act=False, is_normalize=True, name='gcn2')
+        emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1',aggregate=args.gcn_aggregate)
+        emb_node2 = GCN_batch(ob['adj'], emb_node1, 32, is_act=False, is_normalize=True, name='gcn2',aggregate=args.gcn_aggregate)
         # emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
         emb_graph = tf.reduce_sum(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
         pred = tf.layers.dense(emb_graph, 1, activation=tf.nn.sigmoid, name='linear1')
         return pred
 
-def discriminator(x,x_gen,name='d_net'):
-    d = discriminator_net(x, name=name)
-    d_ = discriminator_net(x_gen,name=name)
+def discriminator(x,x_gen,args,name='d_net'):
+    d = discriminator_net(x,args,name=name)
+    d_ = discriminator_net(x_gen,args,name=name)
 
     d = tf.reduce_mean(d)
     d_ = tf.reduce_mean(d_)
@@ -123,13 +158,18 @@ class GCNPolicy(object):
         self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,4]) # feed groudtruth action
         if kind == 'small':
             ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
-            self.emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1')
+            if args.has_concat==1:
+                self.emb_node1 = tf.concat((GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate),ob_node),axis=-1)
+            else:
+                self.emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
             for i in range(args.layer_num-2):
                 if args.has_residual==1:
-                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1))+self.emb_node1
+                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate)+self.emb_node1
+                elif args.has_concat==1:
+                    self.emb_node1 = tf.concat((GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate),self.emb_node1),axis=-1)
                 else:
-                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_' + str(i + 1))
-            self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn2')
+                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_' + str(i + 1),aggregate=args.gcn_aggregate)
+            self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn2',aggregate=args.gcn_aggregate)
             emb_node = tf.squeeze(self.emb_node2,axis=1)  # B*n*f
             emb_graph = tf.reduce_max(emb_node,axis=1,keepdims=True)
             if args.graph_emb==1:
@@ -180,11 +220,11 @@ class GCNPolicy(object):
         # using own prediction
 
         # mlp
-        # emb_cat = tf.concat([tf.tile(emb_first,[1,tf.shape(emb_node)[1],1]),emb_node],axis=2)
-        # self.logits_second = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_second1')
-        # self.logits_second = tf.layers.dense(self.logits_second, 1, activation=None, name='logits_second2')
+        emb_cat = tf.concat([tf.tile(emb_first,[1,tf.shape(emb_node)[1],1]),emb_node],axis=2)
+        self.logits_second = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_second1')
+        self.logits_second = tf.layers.dense(self.logits_second, 1, activation=None, name='logits_second2')
         # # bilinear
-        self.logits_second = tf.transpose(bilinear(emb_first, emb_node, name='logits_second'), [0, 2, 1])
+        # self.logits_second = tf.transpose(bilinear(emb_first, emb_node, name='logits_second'), [0, 2, 1])
 
         self.logits_second = tf.squeeze(self.logits_second, axis=-1)
         ac_first_mask = tf.one_hot(ac_first, depth=tf.shape(emb_node)[1], dtype=tf.bool, on_value=False, off_value=True)
@@ -200,11 +240,11 @@ class GCNPolicy(object):
 
         # using groudtruth
         # mlp
-        # emb_cat = tf.concat([tf.tile(emb_first_real, [1, tf.shape(emb_node)[1], 1]), emb_node], axis=2)
-        # self.logits_second_real = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_second1',reuse=True)
-        # self.logits_second_real = tf.layers.dense(self.logits_second_real, 1, activation=None, name='logits_second2',reuse=True)
+        emb_cat = tf.concat([tf.tile(emb_first_real, [1, tf.shape(emb_node)[1], 1]), emb_node], axis=2)
+        self.logits_second_real = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_second1',reuse=True)
+        self.logits_second_real = tf.layers.dense(self.logits_second_real, 1, activation=None, name='logits_second2',reuse=True)
         # # bilinear
-        self.logits_second_real = tf.transpose(bilinear(emb_first_real, emb_node, name='logits_second'), [0, 2, 1])
+        # self.logits_second_real = tf.transpose(bilinear(emb_first_real, emb_node, name='logits_second'), [0, 2, 1])
 
         self.logits_second_real = tf.squeeze(self.logits_second_real, axis=-1)
         ac_first_mask_real = tf.one_hot(ac_first_real, depth=tf.shape(emb_node)[1], dtype=tf.bool, on_value=False, off_value=True)
@@ -219,25 +259,25 @@ class GCNPolicy(object):
         ### 3.3 predict edge type
         # using own prediction
         # MLP
-        # emb_cat = tf.concat([emb_first,emb_second],axis=-1)
-        # self.logits_edge = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_edge1')
-        # self.logits_edge = tf.layers.dense(self.logits_edge, ob['adj'].get_shape()[1], activation=None, name='logits_edge2')
-        # self.logits_edge = tf.squeeze(self.logits_edge,axis=1)
+        emb_cat = tf.concat([emb_first,emb_second],axis=-1)
+        self.logits_edge = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_edge1')
+        self.logits_edge = tf.layers.dense(self.logits_edge, ob['adj'].get_shape()[1], activation=None, name='logits_edge2')
+        self.logits_edge = tf.squeeze(self.logits_edge,axis=1)
         # # bilinear
-        self.logits_edge = tf.reshape(bilinear_multi(emb_first,emb_second,out_dim=ob['adj'].get_shape()[1]),[-1,ob['adj'].get_shape()[1]])
+        # self.logits_edge = tf.reshape(bilinear_multi(emb_first,emb_second,out_dim=ob['adj'].get_shape()[1]),[-1,ob['adj'].get_shape()[1]])
         pd_edge = CategoricalPdType(-1).pdfromflat(self.logits_edge)
         ac_edge = pd_edge.sample()
 
         # using ground truth
         # MLP
-        # emb_cat = tf.concat([emb_first, emb_second], axis=-1)
-        # self.logits_edge_real = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_edge1', reuse=True)
-        # self.logits_edge_real = tf.layers.dense(self.logits_edge_real, ob['adj'].get_shape()[1], activation=None,
-        #                                    name='logits_edge2', reuse=True)
-        # self.logits_edge_real = tf.squeeze(self.logits_edge_real, axis=1)
+        emb_cat = tf.concat([emb_first, emb_second], axis=-1)
+        self.logits_edge_real = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_edge1', reuse=True)
+        self.logits_edge_real = tf.layers.dense(self.logits_edge_real, ob['adj'].get_shape()[1], activation=None,
+                                           name='logits_edge2', reuse=True)
+        self.logits_edge_real = tf.squeeze(self.logits_edge_real, axis=1)
         # # bilinear
-        self.logits_edge_real = tf.reshape(bilinear_multi(emb_first_real, emb_second_real, out_dim=ob['adj'].get_shape()[1]),
-                                      [-1, ob['adj'].get_shape()[1]])
+        # self.logits_edge_real = tf.reshape(bilinear_multi(emb_first_real, emb_second_real, out_dim=ob['adj'].get_shape()[1]),
+        #                               [-1, ob['adj'].get_shape()[1]])
 
 
         # ncat_list = [tf.shape(logits_first),ob_space['adj'].shape[-1],ob_space['adj'].shape[0]]

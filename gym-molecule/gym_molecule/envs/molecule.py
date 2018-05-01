@@ -157,7 +157,7 @@ class MoleculeEnv(gym.Env):
         # todo: add terminal action
         if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop:
             # default reward
-            reward_valid = 6
+            reward_valid = 2
             reward_qed = 0
             reward_sa = 0
             reward_logp = 0
@@ -165,7 +165,7 @@ class MoleculeEnv(gym.Env):
             flag_zinc_molecule_filter = True
 
             if not self.check_chemical_validity():
-                reward_valid -= 10
+                reward_valid -= 5
             else:
                 # final mol object where any radical electrons are changed to bonds to hydrogen
                 final_mol = self.get_final_mol()
@@ -174,10 +174,10 @@ class MoleculeEnv(gym.Env):
 
                 # mol filters with negative rewards
                 if not steric_strain_filter(final_mol):  # passes 3D conversion, no excessive strain
-                    reward_valid -= 3
+                    reward_valid -= 1
                     flag_steric_strain_filter = False
                 if not zinc_molecule_filter(final_mol):  # does not contain any problematic functional groups
-                    reward_valid -= 3
+                    reward_valid -= 1
                     flag_zinc_molecule_filter = False
 
 
@@ -190,7 +190,7 @@ class MoleculeEnv(gym.Env):
                     reward_sa += (sa + 10) / (10 - 1) * self.sa_ratio
                     # 3. Logp reward. Higher the better
                     # reward_logp += MolLogP(self.mol)/10 * self.logp_ratio
-                    reward_logp += reward_penalized_log_p(final_mol)
+                    reward_logp += reward_penalized_log_p(final_mol)/5
                 except: # if any property reward error, reset all
                     print('reward error')
 
