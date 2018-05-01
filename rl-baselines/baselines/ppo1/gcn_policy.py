@@ -52,7 +52,7 @@ def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, 
             node_embedding = tf.nn.relu(node_embedding)
         if aggregate == 'sum':
             node_embedding = tf.reduce_sum(node_embedding, axis=1, keepdims=True)  # mean pooling
-        if aggregate=='mean':
+        elif aggregate=='mean':
             node_embedding = tf.reduce_mean(node_embedding,axis=1,keepdims=True) # mean pooling
         elif aggregate=='concat':
             node_embedding = tf.concat(tf.split(node_embedding,axis=1,num_or_size_splits=edge_dim),axis=3)

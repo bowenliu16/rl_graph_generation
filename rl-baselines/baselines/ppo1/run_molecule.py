@@ -26,7 +26,7 @@ def train(args,seed,writer=None):
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
     env = gym.make('molecule-v0')
-    env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize) # remember call this after gym.make!!
+    env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj) # remember call this after gym.make!!
     print(env.observation_space)
     def policy_fn(name, ob_space, ac_space): #pylint: disable=W0613
         # return cnn_policy.CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
@@ -73,9 +73,9 @@ def molecule_arg_parser():
     parser.add_argument('--logp_ratio', type=float, default=1)
     parser.add_argument('--qed_ratio', type=float, default=1)
     parser.add_argument('--sa_ratio', type=float, default=1)
-    parser.add_argument('--gan_step_ratio', type=float, default=3)
-    parser.add_argument('--gan_final_ratio', type=float, default=3)
-    parser.add_argument('--reward_step_total', type=float, default=1)
+    parser.add_argument('--gan_step_ratio', type=float, default=1)
+    parser.add_argument('--gan_final_ratio', type=float, default=1)
+    parser.add_argument('--reward_step_total', type=float, default=0.5)
     # parser.add_argument('--has_rl', type=int, default=1)
     # parser.add_argument('--has_expert', type=int, default=1)
     parser.add_argument('--has_d_step', type=int, default=1)
@@ -84,22 +84,23 @@ def molecule_arg_parser():
     parser.add_argument('--rl_start', type=int, default=1500)
     parser.add_argument('--rl_end', type=int, default=int(1e6))
     parser.add_argument('--expert_start', type=int, default=0)
-    parser.add_argument('--expert_end', type=int, default=4000)
+    parser.add_argument('--expert_end', type=int, default=2000)
     parser.add_argument('--save_every', type=int, default=500)
-    parser.add_argument('--load', type=int, default=1)
-    parser.add_argument('--load_step', type=int, default=2000)
+    parser.add_argument('--load', type=int, default=0)
+    parser.add_argument('--load_step', type=int, default=1500)
     # parser.add_argument('--load_step', type=int, default=0)
     parser.add_argument('--curriculum', type=int, default=0)
     parser.add_argument('--curriculum_num', type=int, default=6)
     parser.add_argument('--curriculum_step', type=int, default=200)
     parser.add_argument('--supervise_time', type=int, default=2)
-    parser.add_argument('--normalize', type=int, default=0)
+    parser.add_argument('--normalize_adj', type=int, default=0)
     parser.add_argument('--layer_num', type=int, default=3)
     parser.add_argument('--graph_emb', type=int, default=0)
-    parser.add_argument('--stop_shift', type=int, default=-3)
-    parser.add_argument('--has_residual', type=int, default=1)
-    parser.add_argument('--emb_size', type=int, default=32)
-    parser.add_argument('--gcn_aggregate', type=str, default='sum')# sum, mean, concat
+    parser.add_argument('--stop_shift', type=int, default=-1)
+    parser.add_argument('--has_residual', type=int, default=0)
+    parser.add_argument('--has_concat', type=int, default=1)
+    parser.add_argument('--emb_size', type=int, default=64)
+    parser.add_argument('--gcn_aggregate', type=str, default='mean')# sum, mean, concat
 
 
 
