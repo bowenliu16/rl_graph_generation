@@ -120,19 +120,19 @@ def emb_node(ob_node,out_channels):
     return ob_node @ tf.tile(emb,[batch_size,1,1,1])
 
 
-def discriminator_net(ob, name='d_net'):
+def discriminator_net(ob,args,name='d_net'):
     with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
         ob_node = tf.layers.dense(ob['node'], 8, activation=None, use_bias=False, name='emb')  # embedding layer
-        emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1')
-        emb_node2 = GCN_batch(ob['adj'], emb_node1, 32, is_act=False, is_normalize=True, name='gcn2')
+        emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1',aggregate=args.gcn_aggregate)
+        emb_node2 = GCN_batch(ob['adj'], emb_node1, 32, is_act=False, is_normalize=True, name='gcn2',aggregate=args.gcn_aggregate)
         # emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
         emb_graph = tf.reduce_sum(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
         pred = tf.layers.dense(emb_graph, 1, activation=tf.nn.sigmoid, name='linear1')
         return pred
 
-def discriminator(x,x_gen,name='d_net'):
-    d = discriminator_net(x, name=name)
-    d_ = discriminator_net(x_gen,name=name)
+def discriminator(x,x_gen,args,name='d_net'):
+    d = discriminator_net(x,args,name=name)
+    d_ = discriminator_net(x_gen,args,name=name)
 
     d = tf.reduce_mean(d)
     d_ = tf.reduce_mean(d_)
@@ -159,17 +159,17 @@ class GCNPolicy(object):
         if kind == 'small':
             ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
             if args.has_concat==1:
-                self.emb_node1 = tf.concat((GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1'),ob_node),axis=-1)
+                self.emb_node1 = tf.concat((GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate),ob_node),axis=-1)
             else:
-                self.emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1')
+                self.emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
             for i in range(args.layer_num-2):
                 if args.has_residual==1:
-                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1))+self.emb_node1
+                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate)+self.emb_node1
                 elif args.has_concat==1:
-                    self.emb_node1 = tf.concat((GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1)),self.emb_node1),axis=-1)
+                    self.emb_node1 = tf.concat((GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate),self.emb_node1),axis=-1)
                 else:
-                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_' + str(i + 1))
-            self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn2')
+                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_' + str(i + 1),aggregate=args.gcn_aggregate)
+            self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn2',aggregate=args.gcn_aggregate)
             emb_node = tf.squeeze(self.emb_node2,axis=1)  # B*n*f
             emb_graph = tf.reduce_max(emb_node,axis=1,keepdims=True)
             if args.graph_emb==1:
