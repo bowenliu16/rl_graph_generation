@@ -190,7 +190,7 @@ class MoleculeEnv(gym.Env):
                     reward_sa += (sa + 10) / (10 - 1) * self.sa_ratio
                     # 3. Logp reward. Higher the better
                     # reward_logp += MolLogP(self.mol)/10 * self.logp_ratio
-                    reward_logp += reward_penalized_log_p(final_mol)/5
+                    reward_logp += reward_penalized_log_p(final_mol)/5 * self.logp_ratio
                 except: # if any property reward error, reset all
                     print('reward error')
 

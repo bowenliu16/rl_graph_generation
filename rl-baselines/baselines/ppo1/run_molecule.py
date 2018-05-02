@@ -42,7 +42,7 @@ def train(args,seed,writer=None):
         max_timesteps=args.num_steps,
         timesteps_per_actorbatch=256,
         clip_param=0.2, entcoeff=0.01,
-        optim_epochs=4, optim_stepsize=1e-3, optim_batchsize=32,
+        optim_epochs=4, optim_stepsize=args.lr, optim_batchsize=32,
         gamma=0.99, lam=0.95,
         schedule='linear', writer=writer
     )
@@ -66,16 +66,17 @@ def molecule_arg_parser():
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--num_steps', type=int, default=int(5e7))
     parser.add_argument('--name', type=str, default='test')
-    parser.add_argument('--name_load', type=str, default='new_expert_correct')
+    parser.add_argument('--name_load', type=str, default='0new_concat_sum_layer3_expert1500')
     # parser.add_argument('--name_load', type=str, default='test')
     parser.add_argument('--dataset', type=str, default='zinc')
     parser.add_argument('--dataset_load', type=str, default='zinc')
     parser.add_argument('--logp_ratio', type=float, default=1)
     parser.add_argument('--qed_ratio', type=float, default=1)
     parser.add_argument('--sa_ratio', type=float, default=1)
-    parser.add_argument('--gan_step_ratio', type=float, default=1)
-    parser.add_argument('--gan_final_ratio', type=float, default=3)
+    parser.add_argument('--gan_step_ratio', type=float, default=2)
+    parser.add_argument('--gan_final_ratio', type=float, default=5)
     parser.add_argument('--reward_step_total', type=float, default=0.5)
+    parser.add_argument('--lr', type=float, default=1e-3)
     # parser.add_argument('--has_rl', type=int, default=1)
     # parser.add_argument('--has_expert', type=int, default=1)
     parser.add_argument('--has_d_step', type=int, default=1)
@@ -98,9 +99,9 @@ def molecule_arg_parser():
     parser.add_argument('--graph_emb', type=int, default=0)
     parser.add_argument('--stop_shift', type=int, default=-1)
     parser.add_argument('--has_residual', type=int, default=0)
-    parser.add_argument('--has_concat', type=int, default=1)
+    parser.add_argument('--has_concat', type=int, default=0)
     parser.add_argument('--emb_size', type=int, default=64)
-    parser.add_argument('--gcn_aggregate', type=str, default='sum')# sum, mean, concat
+    parser.add_argument('--gcn_aggregate', type=str, default='mean')# sum, mean, concat
 
 
 
