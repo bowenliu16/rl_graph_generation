@@ -66,7 +66,7 @@ def molecule_arg_parser():
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--num_steps', type=int, default=int(5e7))
     parser.add_argument('--name', type=str, default='test')
-    parser.add_argument('--name_load', type=str, default='0new_concat_mean_layer3_expert1500')
+    parser.add_argument('--name_load', type=str, default='0new_concatno_mean_layer3_expert1500')
     # parser.add_argument('--name_load', type=str, default='test')
     parser.add_argument('--dataset', type=str, default='zinc')
     parser.add_argument('--dataset_load', type=str, default='zinc')

@@ -1354,7 +1354,7 @@ if __name__ == '__main__':
     # print(max(atom_list),max(bond_list))
 
 
-    # print(reward_penalized_log_p(Chem.MolFromSmiles('O=C1OC(F)=C(F)C(N2C(O)=C2C2CC2)=C1Cl')))
+    print(reward_penalized_log_p(Chem.MolFromSmiles('C=[IH2][IH2](I)[IH2](I)I(I)(II)(C(I)I)P(I)([IH2]=I)(P(I)P(I)I)P(I)(I)(I)(I)([IH2]=I)P(I)(I)(PI)II')))
     # env.get_expert(4)
 
     # env.step(np.array([[0,3,0]]))
