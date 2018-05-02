@@ -199,8 +199,8 @@ class MoleculeEnv(gym.Env):
             # if self.level==0:
             #     reward = reward_step + reward_valid
             # if self.level==1:
-            # reward = reward_step + reward_valid + reward_logp
-            reward = reward_step + reward_valid + reward_qed*2
+            reward = reward_step + reward_valid + reward_logp
+            # reward = reward_step + reward_valid + reward_qed*2
             info['smile'] = self.get_final_smiles()
             info['reward_valid'] = reward_valid
             info['reward_qed'] = reward_qed
