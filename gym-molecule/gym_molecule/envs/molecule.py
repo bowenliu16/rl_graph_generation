@@ -208,6 +208,9 @@ class MoleculeEnv(gym.Env):
                         reward_final += reward_target_mw(final_mol, target=self.reward_target)
                     elif self.reward_type == 'gan':
                         reward_final = 0
+                    else:
+                        print('reward error!')
+                        reward_final = 0
 
 
 
