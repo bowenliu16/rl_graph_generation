@@ -88,7 +88,7 @@ def molecule_arg_parser():
     parser.add_argument('--has_d_step', type=int, default=1)
     parser.add_argument('--has_d_final', type=int, default=1)
     parser.add_argument('--has_ppo', type=int, default=1)
-    parser.add_argument('--rl_start', type=int, default=500)
+    parser.add_argument('--rl_start', type=int, default=2)
     parser.add_argument('--rl_end', type=int, default=int(1e6))
     parser.add_argument('--expert_start', type=int, default=0)
     parser.add_argument('--expert_end', type=int, default=1000)
@@ -119,6 +119,7 @@ def molecule_arg_parser():
 
 def main():
     args = molecule_arg_parser().parse_args()
+    print(args)
     args.name_full = args.env + '_' + args.dataset + '_' + args.name
     args.name_full_load = args.env + '_' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)
     # check and clean

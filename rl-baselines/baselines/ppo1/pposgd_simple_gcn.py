@@ -203,8 +203,12 @@ def learn(args,env, policy_fn, *,
     ob['node'] = U.get_placeholder_cached(name="node")
 
     ob_gen = {}
-    ob_gen['adj'] = U.get_placeholder(shape=[None,ob_space['adj'].shape[0],None,None],dtype=tf.float32,name='adj_gen')
-    ob_gen['node'] = U.get_placeholder(shape=[None,1,None,ob_space['node'].shape[2]],dtype=tf.float32,name='node_gen')
+    ob_gen['adj'] = U.get_placeholder(shape=[None, ob_space['adj'].shape[0], None, None], dtype=tf.float32,name='adj_gen')
+    ob_gen['node'] = U.get_placeholder(shape=[None, 1, None, ob_space['node'].shape[2]], dtype=tf.float32,name='node_gen')
+
+    ob_real = {}
+    ob_real['adj'] = U.get_placeholder(shape=[None,ob_space['adj'].shape[0],None,None],dtype=tf.float32,name='adj_real')
+    ob_real['node'] = U.get_placeholder(shape=[None,1,None,ob_space['node'].shape[2]],dtype=tf.float32,name='node_real')
 
     # ac = pi.pdtype.sample_placeholder([None])
     # ac = tf.placeholder(dtype=tf.int64,shape=env.action_space.nvec.shape)
@@ -234,9 +238,9 @@ def learn(args,env, policy_fn, *,
     loss_expert = -tf.reduce_mean(pi_logp)
 
     ## Discriminator loss
-    loss_d_step, _, _ = discriminator(ob, ob_gen,args, name='d_step')
+    loss_d_step, _, _ = discriminator(ob_real, ob_gen,args, name='d_step')
     loss_d_gen_step = discriminator_net(ob_gen,args, name='d_step')
-    loss_d_final, _, _ = discriminator(ob, ob_gen,args, name='d_final')
+    loss_d_final, _, _ = discriminator(ob_real, ob_gen,args, name='d_final')
     loss_d_gen_final = discriminator_net(ob_gen,args, name='d_final')
 
 
@@ -282,8 +286,8 @@ def learn(args,env, policy_fn, *,
     lossandgrad_ppo = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list_pi)])
     lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi)])
     lossandgrad_expert_stop = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi_stop)])
-    lossandgrad_d_step = U.function([ob['adj'], ob['node'], ob_gen['adj'], ob_gen['node']], [loss_d_step, U.flatgrad(loss_d_step, var_list_d_step)])
-    lossandgrad_d_final = U.function([ob['adj'], ob['node'], ob_gen['adj'], ob_gen['node']], [loss_d_final, U.flatgrad(loss_d_final, var_list_d_final)])
+    lossandgrad_d_step = U.function([ob_real['adj'], ob_real['node'], ob_gen['adj'], ob_gen['node']], [loss_d_step, U.flatgrad(loss_d_step, var_list_d_step)])
+    lossandgrad_d_final = U.function([ob_real['adj'], ob_real['node'], ob_gen['adj'], ob_gen['node']], [loss_d_final, U.flatgrad(loss_d_final, var_list_d_final)])
     loss_d_gen_step_func = U.function([ob_gen['adj'], ob_gen['node']], loss_d_gen_step)
     loss_d_gen_final_func = U.function([ob_gen['adj'], ob_gen['node']], loss_d_gen_final)
 
@@ -328,7 +332,7 @@ def learn(args,env, policy_fn, *,
         try:
             fname = './ckpt/' + args.name_full_load
             sess = tf.get_default_session()
-            sess.run(tf.global_variables_initializer())
+            # sess.run(tf.global_variables_initializer())
             saver = tf.train.Saver(var_list_pi)
             saver.restore(sess, fname)
             iters_so_far = int(fname.split('_')[-1])+1
@@ -425,6 +429,7 @@ def learn(args,env, policy_fn, *,
                         # update step discriminator
                         ob_expert, _ = env.get_expert(optim_batchsize,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
                         loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
+                        print('loss_d_step',loss_d_step,g_d_step)
                         adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
                         losses_d_step.append(loss_d_step)
                 loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)
