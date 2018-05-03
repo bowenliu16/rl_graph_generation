@@ -429,7 +429,7 @@ def learn(args,env, policy_fn, *,
                         # update step discriminator
                         ob_expert, _ = env.get_expert(optim_batchsize,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
                         loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
-                        print('loss_d_step',loss_d_step,g_d_step)
+                        # print('loss_d_step',loss_d_step,g_d_step)
                         adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
                         losses_d_step.append(loss_d_step)
                 loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)
