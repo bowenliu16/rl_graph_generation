@@ -382,13 +382,12 @@ def learn(args,env, policy_fn, *,
             for _ in range(optim_epochs*args.supervise_time):
                 # learn how to stop
                 ob_expert, ac_expert = env.get_expert(optim_batchsize, is_final=True)
-                losses_expert_stop, g_expert = lossandgrad_expert_stop(ob_expert['adj'], ob_expert['node'], ac_expert,
-                                                                       ac_expert)
-                adam_pi_stop.update(g_expert, optim_stepsize * cur_lrmult)
+                losses_expert_stop, g_expert = lossandgrad_expert_stop(ob_expert['adj'], ob_expert['node'], ac_expert,ac_expert)
+                adam_pi_stop.update(g_expert, optim_stepsize * cur_lrmult/10)
                 losses_stop.append(losses_expert_stop)
                 ob_expert, ac_expert = env.get_expert(optim_batchsize)
                 losses_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
-                adam_pi.update(g_expert, optim_stepsize * cur_lrmult)
+                adam_pi.update(g_expert, optim_stepsize * cur_lrmult/10)
                 losses.append(losses_expert)
 
             loss_expert = np.mean(losses, axis=0, keepdims=True)
