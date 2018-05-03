@@ -56,11 +56,13 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         pass
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5):
         '''
         own init function, since gym does not support passing argument
         '''
         self.is_normalize = bool(is_normalize)
+        self.reward_type = reward_type
+        self.reward_target = reward_target
         self.mol = Chem.RWMol()
         self.smile_list = []
         if data_type=='gdb':
@@ -161,6 +163,7 @@ class MoleculeEnv(gym.Env):
             reward_qed = 0
             reward_sa = 0
             reward_logp = 0
+            reward_final = 0
             flag_steric_strain_filter = True
             flag_zinc_molecule_filter = True
 
@@ -190,7 +193,24 @@ class MoleculeEnv(gym.Env):
                     reward_sa += (sa + 10) / (10 - 1) * self.sa_ratio
                     # 3. Logp reward. Higher the better
                     # reward_logp += MolLogP(self.mol)/10 * self.logp_ratio
-                    reward_logp += reward_penalized_log_p(final_mol)/5 * self.logp_ratio
+                    reward_logp += reward_penalized_log_p(final_mol) * self.logp_ratio
+                    if self.reward_type == 'logppen':
+                        reward_final += reward_penalized_log_p(final_mol)/5
+                    elif self.reward_type == 'logp_target':
+                        reward_final += reward_target_logp(final_mol,target=self.reward_target)
+                    elif self.reward_type == 'qed':
+                        reward_final += reward_qed
+                    elif self.reward_type == 'qedsa':
+                        reward_final += reward_qed + reward_sa
+                    elif self.reward_type == 'qed_target':
+                        reward_final += reward_target_qed(final_mol, target=self.reward_target)
+                    elif self.reward_type == 'mw_target':
+                        reward_final += reward_target_mw(final_mol, target=self.reward_target)
+                    elif self.reward_type == 'gan':
+                        reward_final = 0
+
+
+
                 except: # if any property reward error, reset all
                     print('reward error')
 
@@ -199,13 +219,13 @@ class MoleculeEnv(gym.Env):
             # if self.level==0:
             #     reward = reward_step + reward_valid
             # if self.level==1:
-            reward = reward_step + reward_valid + reward_logp
+            reward = reward_step + reward_valid + reward_final
             # reward = reward_step + reward_valid + reward_qed*2
             info['smile'] = self.get_final_smiles()
             info['reward_valid'] = reward_valid
             info['reward_qed'] = reward_qed
             info['reward_sa'] = reward_sa
-            info['final_stat'] = reward_logp
+            info['final_stat'] = reward_final
             info['reward'] = reward
             info['flag_steric_strain_filter'] = flag_steric_strain_filter
             info['flag_zinc_molecule_filter'] = flag_zinc_molecule_filter
@@ -1198,26 +1218,48 @@ def steric_strain_filter(mol, cutoff=0.82,
 
 ### TARGET VALUE REWARDS ###
 
-def reward_target_log_p(mol, target):
+def reward_target_logp(mol, target,ratio=3,max=2):
     """
     Reward for a target log p
     :param mol: rdkit mol object
     :param target: float
-    :return: float (-inf, 1]
+    :return: float (-inf, max]
     """
     x = Chem.Crippen.MolLogP(mol)
-    reward = -1 * (x - target)**2 + 1
+    reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
-def reward_target_mw(mol, target):
+def reward_target_penalizelogp(mol, target,ratio=3,max=2):
+    """
+    Reward for a target log p
+    :param mol: rdkit mol object
+    :param target: float
+    :return: float (-inf, max]
+    """
+    x = reward_penalized_log_p(mol)
+    reward = -1 * np.abs((x - target)/ratio) + max
+    return reward
+
+def reward_target_qed(mol, target,ratio=0.3,max=2):
+    """
+    Reward for a target log p
+    :param mol: rdkit mol object
+    :param target: float
+    :return: float (-inf, max]
+    """
+    x = qed(mol)
+    reward = -1 * np.abs((x - target)/ratio) + max
+    return reward
+
+def reward_target_mw(mol, target,ratio=20,max=2):
     """
     Reward for a target molecular weight
     :param mol: rdkit mol object
     :param target: float
-    :return: float (-inf, 1]
+    :return: float (-inf, max]
     """
     x = rdMolDescriptors.CalcExactMolWt(mol)
-    reward = -1 * (x - target)**2 + 1
+    reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
 # TODO(Bowen): num rings is a discrete variable, so what is the best way to
