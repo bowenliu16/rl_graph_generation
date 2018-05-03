@@ -65,14 +65,14 @@ def molecule_arg_parser():
     Create an argparse.ArgumentParser for run_atari.py.
     """
     parser = arg_parser()
-    parser.add_argument('--env', type=str, help='environment name: molecule || graph',
-                        default='graph')
+    parser.add_argument('--env', type=str, help='environment name: molecule; graph',
+                        default='molecule')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--num_steps', type=int, default=int(5e7))
     parser.add_argument('--name', type=str, default='test')
     parser.add_argument('--name_load', type=str, default='0new_concatno_mean_layer3_expert1500')
     # parser.add_argument('--name_load', type=str, default='test')
-    parser.add_argument('--dataset', type=str, default='zinc')
+    parser.add_argument('--dataset', type=str, default='zinc',help='caveman; grid; ba; zinc; gdb')
     parser.add_argument('--dataset_load', type=str, default='zinc')
     parser.add_argument('--logp_ratio', type=float, default=1)
     parser.add_argument('--qed_ratio', type=float, default=1)
@@ -86,10 +86,10 @@ def molecule_arg_parser():
     parser.add_argument('--has_d_step', type=int, default=1)
     parser.add_argument('--has_d_final', type=int, default=1)
     parser.add_argument('--has_ppo', type=int, default=1)
-    parser.add_argument('--rl_start', type=int, default=1000)
+    parser.add_argument('--rl_start', type=int, default=500)
     parser.add_argument('--rl_end', type=int, default=int(1e6))
     parser.add_argument('--expert_start', type=int, default=0)
-    parser.add_argument('--expert_end', type=int, default=1500)
+    parser.add_argument('--expert_end', type=int, default=1000)
     parser.add_argument('--save_every', type=int, default=500)
     parser.add_argument('--load', type=int, default=0)
     parser.add_argument('--load_step', type=int, default=1000)

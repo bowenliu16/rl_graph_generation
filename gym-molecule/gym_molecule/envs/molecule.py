@@ -605,7 +605,22 @@ class MoleculeEnv(gym.Env):
 
 
 
-
+def caveman_special(c=2,k=20,p_path=0.1,p_edge=0.3):
+    p = p_path
+    path_count = max(int(np.ceil(p * k)),1)
+    G = nx.caveman_graph(c, k)
+    # remove 50% edges
+    p = 1-p_edge
+    for (u, v) in list(G.edges()):
+        if np.random.rand() < p and ((u < k and v < k) or (u >= k and v >= k)):
+            G.remove_edge(u, v)
+    # add path_count links
+    for i in range(path_count):
+        u = np.random.randint(0, k)
+        v = np.random.randint(k, k * 2)
+        G.add_edge(u, v)
+    G = max(nx.connected_component_subgraphs(G), key=len)
+    return G
 
 
 class GraphEnv(gym.Env):
@@ -620,27 +635,47 @@ class GraphEnv(gym.Env):
         '''
         self.is_normalize = bool(is_normalize)
         self.graph = nx.Graph()
-        self.max_node = 10
-        self.max_action = 10
         self.reward_step_total = reward_step_total
 
-        # compatible with molecule env
-        self.max_atom = self.max_node
-        self.atom_type_num = 1
-
-
-        self.action_space = gym.spaces.MultiDiscrete([self.max_node, self.max_node, 3, 2])
-        self.observation_space = {}
-        self.observation_space['adj'] = gym.Space(shape=[1,self.max_node,self.max_node])
-        self.observation_space['node'] = gym.Space(shape=[1, self.max_node,1])
 
         self.counter = 0
 
         ## load expert data
-        if dataset == 'ba':
-            self.dataset = [nx.barabasi_albert_graph(9,2) for i in range(200)]
+        if dataset == 'caveman':
+            self.dataset = []
+            for i in range(2, 3):
+                for j in range(6, 11):
+                    for k in range(20):
+                        self.dataset.append(caveman_special(i, j, p_edge=0.8))  # default 0.8
+            self.max_node = 25
+            self.max_action = 150
+        elif dataset == 'grid':
+            self.dataset = []
+            for i in range(2, 5):
+                for j in range(2, 6):
+                    self.dataset.append(nx.grid_2d_graph(i, j))
+            self.max_node = 25
+            self.max_action = 100
+        else:
+            print('default dataset: barabasi')
+            self.dataset = []
+            for i in range(4, 21):
+                for j in range(3, 4):
+                    for k in range(10):
+                        self.dataset.append(nx.barabasi_albert_graph(i, j))
+            self.max_node = 25
+            self.max_action = 150
+
+        self.action_space = gym.spaces.MultiDiscrete([self.max_node, self.max_node, 3, 2])
+        self.observation_space = {}
+        self.observation_space['adj'] = gym.Space(shape=[1, self.max_node, self.max_node])
+        self.observation_space['node'] = gym.Space(shape=[1, self.max_node, 1])
 
         self.level = 0  # for curriculum learning, level starts with 0, and increase afterwards
+
+        # compatible with molecule env
+        self.max_atom = self.max_node
+        self.atom_type_num = 1
 
     def level_up(self):
         self.level += 1
