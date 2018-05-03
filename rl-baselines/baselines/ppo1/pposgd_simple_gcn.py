@@ -113,9 +113,10 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
         cur_ep_len += 1
 
         if new:
-            with open('molecule_gen/'+args.dataset+'_'+args.name+'.csv', 'a') as f:
-                str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
-                f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'], info['reward_logp'], rew_env, rew_d_step, rew_d_final, cur_ep_ret, info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'], info['stop']))
+            if args.env=='molecule':
+                with open('molecule_gen/'+args.name_full+'.csv', 'a') as f:
+                    str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
+                    f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'], info['final_stat'], rew_env, rew_d_step, rew_d_final, cur_ep_ret, info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'], info['stop']))
             ob_adjs_final.append(ob['adj'])
             ob_nodes_final.append(ob['node'])
             ep_rets.append(cur_ep_ret)
@@ -125,7 +126,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
             ep_lens.append(cur_ep_len)
             ep_lens_valid.append(cur_ep_len_valid)
             ep_rew_final.append(rew_env)
-            ep_rew_final_stat.append(info['reward_logp'])
+            ep_rew_final_stat.append(info['final_stat'])
             cur_ep_ret = 0
             cur_ep_len = 0
             cur_ep_len_valid = 0
@@ -325,7 +326,7 @@ def learn(args,env, policy_fn, *,
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
     if args.load==1:
         try:
-            fname = './ckpt/' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)
+            fname = './ckpt/' + args.name_full_load
             sess = tf.get_default_session()
             sess.run(tf.global_variables_initializer())
             saver = tf.train.Saver(var_list_pi)
@@ -514,11 +515,11 @@ def learn(args,env, policy_fn, *,
 
 
         if MPI.COMM_WORLD.Get_rank() == 0:
-            with open('molecule_gen/' + args.dataset+'_'+args.name + '.csv', 'a') as f:
+            with open('molecule_gen/' + args.name_full + '.csv', 'a') as f:
                 f.write('***** Iteration {} *****\n'.format(iters_so_far))
             # save
             if iters_so_far % args.save_every == 0:
-                fname = './ckpt/' + args.dataset + '_' + args.name + '_' + str(iters_so_far)
+                fname = './ckpt/' + args.name_full + '_' + str(iters_so_far)
                 saver = tf.train.Saver(var_list_pi)
                 saver.save(tf.get_default_session(), fname)
                 print('model saved!',fname)

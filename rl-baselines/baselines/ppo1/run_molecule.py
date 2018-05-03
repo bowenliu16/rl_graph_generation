@@ -11,7 +11,7 @@ from tensorboardX import SummaryWriter
 import os
 
 import gym
-# import gym_molecule
+from gym_molecule.envs.molecule import GraphEnv
 
 def train(args,seed,writer=None):
     from baselines.ppo1 import pposgd_simple_gcn, gcn_policy
@@ -25,8 +25,12 @@ def train(args,seed,writer=None):
         logger.configure(format_strs=[])
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
-    env = gym.make('molecule-v0')
-    env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj) # remember call this after gym.make!!
+    if args.env=='molecule':
+        env = gym.make('molecule-v0')
+        env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj) # remember call this after gym.make!!
+    elif args.env=='graph':
+        env = GraphEnv()
+        env.init(reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,dataset=args.dataset) # remember call this after gym.make!!
     print(env.observation_space)
     def policy_fn(name, ob_space, ac_space): #pylint: disable=W0613
         # return cnn_policy.CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
@@ -61,8 +65,8 @@ def molecule_arg_parser():
     Create an argparse.ArgumentParser for run_atari.py.
     """
     parser = arg_parser()
-    parser.add_argument('--env', help='environment ID',
-                        default='BreakoutNoFrameskip-v4')
+    parser.add_argument('--env', type=str, help='environment name: molecule || graph',
+                        default='graph')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--num_steps', type=int, default=int(5e7))
     parser.add_argument('--name', type=str, default='test')
@@ -102,6 +106,8 @@ def molecule_arg_parser():
     parser.add_argument('--has_concat', type=int, default=0)
     parser.add_argument('--emb_size', type=int, default=64)
     parser.add_argument('--gcn_aggregate', type=str, default='mean')# sum, mean, concat
+    parser.add_argument('--name_full',type=str,default='')
+    parser.add_argument('--name_full_load',type=str,default='')
 
 
 
@@ -111,6 +117,8 @@ def molecule_arg_parser():
 
 def main():
     args = molecule_arg_parser().parse_args()
+    args.name_full = args.env + '_' + args.dataset + '_' + args.name
+    args.name_full_load = args.env + '_' + args.dataset_load + '_' + args.name_load + '_' + str(args.load_step)
     # check and clean
     if not os.path.exists('molecule_gen'):
         os.makedirs('molecule_gen')
