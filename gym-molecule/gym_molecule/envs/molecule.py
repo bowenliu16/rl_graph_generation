@@ -16,6 +16,7 @@ from gym_molecule.dataset.dataset_utils import gdb_dataset,mol_to_nx,nx_to_mol
 import random
 import time
 import matplotlib.pyplot as plt
+import csv
 
 from contextlib import contextmanager
 import sys, os
@@ -49,6 +50,23 @@ def convert_radical_electrons_to_hydrogens(mol):
                 a.SetNumRadicalElectrons(0)
                 a.SetNumExplicitHs(num_radical_e)
     return m
+
+
+def load_scaffold():
+    cwd = os.path.dirname(__file__)
+    path = os.path.join(os.path.dirname(cwd), 'dataset',
+                       'vocab.txt')  # gdb 13
+    with open(path, 'r') as fp:
+        reader = csv.reader(fp, delimiter=',', quotechar='"')
+        # next(reader, None)  # skip the headers
+        print(reader)
+        data = [row[0] for row in reader]
+        print(len(data))
+        print(data[0])
+
+
+
+
 
 class MoleculeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -475,6 +493,85 @@ class MoleculeEnv(gym.Env):
         return A, E, F
 
     def get_observation(self):
+        """
+        ob['adj']:b*n*n --- 'E'
+        ob['node']:1*n*m --- 'F'
+        n = atom_num + atom_type_num
+        """
+
+        n = self.mol.GetNumAtoms()
+        n_shift = len(self.possible_atom_types) # assume isolated nodes new nodes exist
+
+        d_n = len(self.possible_atom_types)
+        F = np.zeros((1, self.max_atom, d_n))
+        for a in self.mol.GetAtoms():
+            atom_idx = a.GetIdx()
+            atom_symbol = a.GetSymbol()
+            float_array = (atom_symbol == self.possible_atom_types).astype(float)
+            assert float_array.sum() != 0
+            F[0, atom_idx, :] = float_array
+        temp = F[0,n:n+n_shift,:]
+        F[0,n:n+n_shift,:] = np.eye(n_shift)
+
+        d_e = len(self.possible_bond_types)
+        E = np.zeros((d_e, self.max_atom, self.max_atom))
+        for i in range(d_e):
+            E[i,:n+n_shift,:n+n_shift] = np.eye(n+n_shift)
+        for b in self.mol.GetBonds():
+            begin_idx = b.GetBeginAtomIdx()
+            end_idx = b.GetEndAtomIdx()
+            bond_type = b.GetBondType()
+            float_array = (bond_type == self.possible_bond_types).astype(float)
+            assert float_array.sum() != 0
+            E[:, begin_idx, end_idx] = float_array
+            E[:, end_idx, begin_idx] = float_array
+        ob = {}
+        if self.is_normalize:
+            E = self.normalize_adj(E)
+        ob['adj'] = E
+        ob['node'] = F
+        return ob
+
+
+    # def get_observation_mol(self,mol):
+    #     """
+    #     ob['adj']:b*n*n --- 'E'
+    #     ob['node']:1*n*m --- 'F'
+    #     n = atom_num + atom_type_num
+    #     """
+    #
+    #     n = self.mol.GetNumAtoms()
+    #     d_n = len(self.possible_atom_types)
+    #     F = np.zeros((1, self.max_atom, d_n))
+    #     for a in self.mol.GetAtoms():
+    #         atom_idx = a.GetIdx()
+    #         atom_symbol = a.GetSymbol()
+    #         float_array = (atom_symbol == self.possible_atom_types).astype(float)
+    #         assert float_array.sum() != 0
+    #         F[0, atom_idx, :] = float_array
+    #     temp = F[0,n:n+n_shift,:]
+    #     F[0,n:n+n_shift,:] = np.eye(n_shift)
+    #
+    #     d_e = len(self.possible_bond_types)
+    #     E = np.zeros((d_e, self.max_atom, self.max_atom))
+    #     for i in range(d_e):
+    #         E[i,:n+n_shift,:n+n_shift] = np.eye(n+n_shift)
+    #     for b in self.mol.GetBonds():
+    #         begin_idx = b.GetBeginAtomIdx()
+    #         end_idx = b.GetEndAtomIdx()
+    #         bond_type = b.GetBondType()
+    #         float_array = (bond_type == self.possible_bond_types).astype(float)
+    #         assert float_array.sum() != 0
+    #         E[:, begin_idx, end_idx] = float_array
+    #         E[:, end_idx, begin_idx] = float_array
+    #     ob = {}
+    #     if self.is_normalize:
+    #         E = self.normalize_adj(E)
+    #     ob['adj'] = E
+    #     ob['node'] = F
+    #     return ob
+
+    def get_observation_scaffold(self):
         """
         ob['adj']:b*n*n --- 'E'
         ob['node']:1*n*m --- 'F'
@@ -1405,22 +1502,26 @@ def reward_penalized_log_p(mol):
 
 if __name__ == '__main__':
     # env = gym.make('molecule-v0') # in gym format
-    env = GraphEnv()
-    env.init()
+    # env = GraphEnv()
+    # env.init()
 
 
-    ob = env.reset()
-    print(ob['adj'])
-    print(ob['node'])
-    ob,rew,new,info = env.step(np.array([[2,2,0,0]]))
-    print(ob['adj'])
-    print(ob['node'])
-    print(rew)
-    print(new)
-    print(info)
+    # ob = env.reset()
+    # print(ob['adj'])
+    # print(ob['node'])
+    # ob,rew,new,info = env.step(np.array([[2,2,0,0]]))
+    # print(ob['adj'])
+    # print(ob['node'])
+    # print(rew)
+    # print(new)
+    # print(info)
 
-    ob,ac = env.get_expert(5)
+    # ob,ac = env.get_expert(5)
+
+    load_scaffold()
+
     # print('ob',ob)
+
 
     # print(ob['adj'].shape)
     # print(ob['node'].shape)
