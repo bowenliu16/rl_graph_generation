@@ -58,11 +58,12 @@ def load_scaffold():
                        'vocab.txt')  # gdb 13
     with open(path, 'r') as fp:
         reader = csv.reader(fp, delimiter=',', quotechar='"')
-        # next(reader, None)  # skip the headers
-        print(reader)
-        data = [row[0] for row in reader]
-        print(len(data))
-        print(data[0])
+        data = [Chem.MolFromSmiles(row[0]) for row in reader]
+        data = [mol for mol in data if mol.GetRingInfo().NumRings() == 1 and (mol.GetRingInfo().IsAtomInRingOfSize(0, 5) or mol.GetRingInfo().IsAtomInRingOfSize(0, 6))]
+        for mol in data:
+            Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+        print('num of scaffolds:', len(data))
+        return data
 
 
 
@@ -74,7 +75,7 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         pass
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False):
         '''
         own init function, since gym does not support passing argument
         '''
@@ -119,6 +120,13 @@ class MoleculeEnv(gym.Env):
             path = os.path.join(os.path.dirname(cwd), 'dataset',
                                 '250k_rndm_zinc_drugs_clean_sorted.smi')  # ZINC
         self.dataset = gdb_dataset(path)
+
+        ## load scaffold data if necessary
+        self.has_scaffold = has_scaffold
+        if has_scaffold:
+            self.scaffold = load_scaffold()
+            self.max_scaffold = 6
+
 
         self.level = 0 # for curriculum learning, level starts with 0, and increase afterwards
 
@@ -533,70 +541,28 @@ class MoleculeEnv(gym.Env):
         return ob
 
 
-    # def get_observation_mol(self,mol):
-    #     """
-    #     ob['adj']:b*n*n --- 'E'
-    #     ob['node']:1*n*m --- 'F'
-    #     n = atom_num + atom_type_num
-    #     """
-    #
-    #     n = self.mol.GetNumAtoms()
-    #     d_n = len(self.possible_atom_types)
-    #     F = np.zeros((1, self.max_atom, d_n))
-    #     for a in self.mol.GetAtoms():
-    #         atom_idx = a.GetIdx()
-    #         atom_symbol = a.GetSymbol()
-    #         float_array = (atom_symbol == self.possible_atom_types).astype(float)
-    #         assert float_array.sum() != 0
-    #         F[0, atom_idx, :] = float_array
-    #     temp = F[0,n:n+n_shift,:]
-    #     F[0,n:n+n_shift,:] = np.eye(n_shift)
-    #
-    #     d_e = len(self.possible_bond_types)
-    #     E = np.zeros((d_e, self.max_atom, self.max_atom))
-    #     for i in range(d_e):
-    #         E[i,:n+n_shift,:n+n_shift] = np.eye(n+n_shift)
-    #     for b in self.mol.GetBonds():
-    #         begin_idx = b.GetBeginAtomIdx()
-    #         end_idx = b.GetEndAtomIdx()
-    #         bond_type = b.GetBondType()
-    #         float_array = (bond_type == self.possible_bond_types).astype(float)
-    #         assert float_array.sum() != 0
-    #         E[:, begin_idx, end_idx] = float_array
-    #         E[:, end_idx, begin_idx] = float_array
-    #     ob = {}
-    #     if self.is_normalize:
-    #         E = self.normalize_adj(E)
-    #     ob['adj'] = E
-    #     ob['node'] = F
-    #     return ob
-
-    def get_observation_scaffold(self):
+    def get_observation_mol(self,mol):
         """
         ob['adj']:b*n*n --- 'E'
         ob['node']:1*n*m --- 'F'
         n = atom_num + atom_type_num
         """
 
-        n = self.mol.GetNumAtoms()
-        n_shift = len(self.possible_atom_types) # assume isolated nodes new nodes exist
-
+        n = self.max_scaffold
         d_n = len(self.possible_atom_types)
-        F = np.zeros((1, self.max_atom, d_n))
-        for a in self.mol.GetAtoms():
+        F = np.zeros((1, n, d_n))
+        for a in mol.GetAtoms():
             atom_idx = a.GetIdx()
             atom_symbol = a.GetSymbol()
             float_array = (atom_symbol == self.possible_atom_types).astype(float)
             assert float_array.sum() != 0
             F[0, atom_idx, :] = float_array
-        temp = F[0,n:n+n_shift,:]
-        F[0,n:n+n_shift,:] = np.eye(n_shift)
 
         d_e = len(self.possible_bond_types)
-        E = np.zeros((d_e, self.max_atom, self.max_atom))
+        E = np.zeros((d_e, n, n))
         for i in range(d_e):
-            E[i,:n+n_shift,:n+n_shift] = np.eye(n+n_shift)
-        for b in self.mol.GetBonds():
+            E[i,:,:] = np.eye(n)
+        for b in mol.GetBonds():
             begin_idx = b.GetBeginAtomIdx()
             end_idx = b.GetEndAtomIdx()
             bond_type = b.GetBondType()
@@ -609,6 +575,20 @@ class MoleculeEnv(gym.Env):
             E = self.normalize_adj(E)
         ob['adj'] = E
         ob['node'] = F
+        return ob
+
+
+    def get_observation_scaffold(self):
+        ob = {}
+        atom_type_num = len(self.possible_atom_types)
+        bond_type_num = len(self.possible_bond_types)
+        batch_size = len(self.scaffold)
+        ob['node'] = np.zeros((batch_size, 1, self.max_scaffold, atom_type_num))
+        ob['adj'] = np.zeros((batch_size, bond_type_num, self.max_scaffold, self.max_scaffold))
+        for idx,mol in enumerate(self.scaffold):
+            ob_temp = self.get_observation_mol(mol)
+            ob['node'][idx]=ob_temp['node']
+            ob['adj'][idx]=ob_temp['adj']
         return ob
 
 
@@ -1501,9 +1481,9 @@ def reward_penalized_log_p(mol):
 
 
 if __name__ == '__main__':
-    # env = gym.make('molecule-v0') # in gym format
+    env = gym.make('molecule-v0') # in gym format
     # env = GraphEnv()
-    # env.init()
+    env.init(has_scaffold=True)
 
 
     # ob = env.reset()
@@ -1518,7 +1498,12 @@ if __name__ == '__main__':
 
     # ob,ac = env.get_expert(5)
 
-    load_scaffold()
+    ob = env.get_observation_scaffold()
+    print(ob['adj'].shape)
+    print(ob['node'].shape)
+    for i in range(10):
+        print(ob['adj'][i])
+        print(ob['node'][i])
 
     # print('ob',ob)
 
