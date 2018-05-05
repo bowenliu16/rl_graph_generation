@@ -493,7 +493,7 @@ class GCNPolicy_scaffold(object):
 
         # using ground truth
         # MLP
-        emb_cat = tf.concat([emb_first, emb_second], axis=-1)
+        emb_cat = tf.concat([emb_first_real, emb_second_real], axis=-1)
         self.logits_edge_real = tf.layers.dense(emb_cat, args.emb_size, activation=tf.nn.relu, name='logits_edge1', reuse=True)
         self.logits_edge_real = tf.layers.dense(self.logits_edge_real, ob['adj'].get_shape()[1], activation=None,
                                            name='logits_edge2', reuse=True)
@@ -538,10 +538,10 @@ class GCNPolicy_scaffold(object):
         # debug['ac'] = self.ac
 
         stochastic = tf.placeholder(dtype=tf.bool, shape=())
-        self._act = U.function([stochastic, ob['adj'], ob['node']], [self.ac, self.vpred, debug]) # add debug in second arg if needed
+        self._act = U.function([stochastic, ob['adj'], ob['node'],ob_scaffold['adj'],ob_scaffold['node']], [self.ac, self.vpred, debug]) # add debug in second arg if needed
 
     def act(self, stochastic, ob):
-        return self._act(stochastic, ob['adj'][None], ob['node'][None])
+        return self._act(stochastic, ob['adj'][None], ob['node'][None], ob['adj_scaffold'][None], ob['node_scaffold'][None])
         # return self._act(stochastic, ob['adj'], ob['node'])
 
     def get_variables(self):

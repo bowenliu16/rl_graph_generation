@@ -137,22 +137,22 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
 
         t += 1
 
-# def traj_final_generator(pi, env, batch_size, stochastic):
-#     ob = env.reset()
-#     ob_adj = ob['adj']
-#     ob_node = ob['node']
-#     ob_adjs = np.array([ob_adj for _ in range(batch_size)])
-#     ob_nodes = np.array([ob_node for _ in range(batch_size)])
-#     for i in range(batch_size):
-#         ob = env.reset()
-#         while True:
-#             ac, vpred, debug = pi.act(stochastic, ob)
-#             ob, rew_env, new, info = env.step(ac)
-#             if new:
-#                 ob_adjs[i]=ob['adj']
-#                 ob_nodes[i]=ob['node']
-#                 break
-#     return ob_adjs,ob_nodes
+def traj_final_generator(pi, env, batch_size, stochastic):
+    ob = env.reset()
+    ob_adj = ob['adj']
+    ob_node = ob['node']
+    ob_adjs = np.array([ob_adj for _ in range(batch_size)])
+    ob_nodes = np.array([ob_node for _ in range(batch_size)])
+    for i in range(batch_size):
+        ob = env.reset()
+        while True:
+            ac, vpred, debug = pi.act(stochastic, ob)
+            ob, rew_env, new, info = env.step(ac)
+            if new:
+                ob_adjs[i]=ob['adj']
+                ob_nodes[i]=ob['node']
+                break
+    return ob_adjs,ob_nodes
 
 def add_vtarg_and_adv(seg, gamma, lam):
     """
@@ -437,8 +437,9 @@ def learn(args,env, policy_fn, *,
                 if args.has_d_final==1:
                     # update final discriminator
                     ob_expert, _ = env.get_expert(optim_batchsize,is_final=True,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
-                    # ob_adjs,ob_nodes=traj_final_generator(pi,env,optim_batchsize,True)
-                    loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg["ob_adj_final"], seg["ob_node_final"])
+                    ob_adjs,ob_nodes=traj_final_generator(pi,env,optim_batchsize,True)
+                    # loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg["ob_adj_final"], seg["ob_node_final"])
+                    loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], ob_adjs, ob_nodes)
                     adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
                     # print(seg["ob_adj_final"].shape)
                     # logger.log(fmt_row(13, np.mean(losses, axis=0)))
