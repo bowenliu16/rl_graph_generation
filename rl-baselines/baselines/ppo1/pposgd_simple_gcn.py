@@ -154,6 +154,149 @@ def traj_final_generator(pi, env, batch_size, stochastic):
                 break
     return ob_adjs,ob_nodes
 
+def traj_segment_generator_scaffold(args, pi, env, horizon, stochastic, d_step_func, d_final_func):
+    t = 0
+    ac = env.action_space.sample() # not used, just so we have the datatype
+    new = True # marks if we're on first timestep of an episode
+    ob = env.reset()
+    ob_adj = ob['adj']
+    ob_node = ob['node']
+
+    cur_ep_ret = 0 # return in current episode
+    cur_ep_ret_env = 0
+    cur_ep_ret_d_step = 0
+    cur_ep_ret_d_final = 0
+    cur_ep_len = 0 # len of current episode
+    cur_ep_len_valid = 0
+    ep_rets = [] # returns of completed episodes in this segment
+    ep_rets_d_step = []
+    ep_rets_d_final = []
+    ep_rets_env = []
+    ep_lens = [] # lengths of ...
+    ep_lens_valid = [] # lengths of ...
+    ep_rew_final = []
+    ep_rew_final_stat = []
+
+
+
+    # Initialize history arrays
+    # obs = np.array([ob for _ in range(horizon)])
+    ob_adjs = np.array([ob_adj for _ in range(horizon)])
+    ob_nodes = np.array([ob_node for _ in range(horizon)])
+    ob_adjs_final = []
+    ob_nodes_final = []
+    rews = np.zeros(horizon, 'float32')
+    vpreds = np.zeros(horizon, 'float32')
+    news = np.zeros(horizon, 'int32')
+    acs = np.array([ac for _ in range(horizon)])
+    prevacs = acs.copy()
+
+    while True:
+        prevac = ac
+        # print('-------ac-call-----------')
+        ac, vpred, debug = pi.act(stochastic, ob)
+        # print('ob',ob)
+        # print('debug ob_len',debug['ob_len'])
+        # print('debug logits_stop_yes', debug['logits_stop_yes'])
+        # print('debug logits_second_mask',debug['logits_second_mask'])
+        # print('debug logits_first_mask', debug['logits_first_mask'])
+        # print('debug logits_second_mask', debug['logits_second_mask'])
+        # print('debug',debug)
+        # print('ac',ac)
+
+        # Slight weirdness here because we need value function at time T
+        # before returning segment [0, T-1] so we get the correct
+        # terminal value
+        if t > 0 and t % horizon == 0:
+            yield {"ob_adj" : ob_adjs, "ob_node" : ob_nodes,"ob_adj_final" : np.array(ob_adjs_final), "ob_node_final" : np.array(ob_nodes_final), "rew" : rews, "vpred" : vpreds, "new" : news,
+                    "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "ep_lens_valid" : ep_lens_valid, "ep_final_rew":ep_rew_final, "ep_final_rew_stat":ep_rew_final_stat,"ep_rets_env" : ep_rets_env,"ep_rets_d_step" : ep_rets_d_step,"ep_rets_d_final" : ep_rets_d_final}
+            # Be careful!!! if you change the downstream algorithm to aggregate
+            # several of these batches, then be sure to do a deepcopy
+            ep_rets = []
+            ep_lens = []
+            ep_lens_valid = []
+            ep_rew_final = []
+            ep_rew_final_stat = []
+            ep_rets_d_step = []
+            ep_rets_d_final = []
+            ep_rets_env = []
+            ob_adjs_final = []
+            ob_nodes_final = []
+
+        i = t % horizon
+        # obs[i] = ob
+        ob_adjs[i] = ob['adj']
+        ob_nodes[i] = ob['node']
+        vpreds[i] = vpred
+        news[i] = new
+        acs[i] = ac
+        prevacs[i] = prevac
+
+        ob, rew_env, new, info = env.step(ac)
+        rew_d_step = 0 # default
+        if rew_env>0: # if action valid
+            cur_ep_len_valid += 1
+            # add stepwise discriminator reward
+            if args.has_d_step==1:
+                rew_d_step = args.gan_step_ratio * (
+                    1 - d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0]) / env.max_atom
+        rew_d_final = 0 # default
+        if new:
+            if args.has_d_final==1:
+                rew_d_final = args.gan_final_ratio * (
+                    1 - d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0])
+
+        rews[i] = rew_d_step + rew_env +rew_d_final
+
+        cur_ep_ret += rews[i]
+        cur_ep_ret_d_step += rew_d_step
+        cur_ep_ret_d_final += rew_d_final
+        cur_ep_ret_env += rew_env
+        cur_ep_len += 1
+
+        if new:
+            if args.env=='molecule':
+                with open('molecule_gen/'+args.name_full+'.csv', 'a') as f:
+                    str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
+                    f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'], info['final_stat'], rew_env, rew_d_step, rew_d_final, cur_ep_ret, info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'], info['stop']))
+            ob_adjs_final.append(ob['adj'])
+            ob_nodes_final.append(ob['node'])
+            ep_rets.append(cur_ep_ret)
+            ep_rets_env.append(cur_ep_ret_env)
+            ep_rets_d_step.append(cur_ep_ret_d_step)
+            ep_rets_d_final.append(cur_ep_ret_d_final)
+            ep_lens.append(cur_ep_len)
+            ep_lens_valid.append(cur_ep_len_valid)
+            ep_rew_final.append(rew_env)
+            ep_rew_final_stat.append(info['final_stat'])
+            cur_ep_ret = 0
+            cur_ep_len = 0
+            cur_ep_len_valid = 0
+            cur_ep_ret_d_step = 0
+            cur_ep_ret_d_final = 0
+            cur_ep_ret_env = 0
+            ob = env.reset()
+
+        t += 1
+
+def traj_final_generator_scaffold(pi, env, batch_size, stochastic):
+    ob = env.reset()
+    ob_adj = ob['adj']
+    ob_node = ob['node']
+    ob_adjs = np.array([ob_adj for _ in range(batch_size)])
+    ob_nodes = np.array([ob_node for _ in range(batch_size)])
+    for i in range(batch_size):
+        ob = env.reset()
+        while True:
+            ac, vpred, debug = pi.act(stochastic, ob)
+            ob, rew_env, new, info = env.step(ac)
+            if new:
+                ob_adjs[i]=ob['adj']
+                ob_nodes[i]=ob['node']
+                break
+    return ob_adjs,ob_nodes
+
 def add_vtarg_and_adv(seg, gamma, lam):
     """
     Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
@@ -417,6 +560,11 @@ def learn(args,env, policy_fn, *,
             # logger.log("Optimizing...")
             # logger.log(fmt_row(13, loss_names))
             # Here we do a bunch of optimization epochs over the data
+            if args.has_d_final == 1:
+                ob_adjs, ob_nodes = traj_final_generator(pi, env, optim_batchsize, True)
+                ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,
+                                              level_total=args.curriculum_num, level=level)
+
             for _ in range(optim_epochs):
                 losses_ppo = [] # list of tuples, each of which gives the loss for a minibatch
                 losses_d_step = []
@@ -436,8 +584,6 @@ def learn(args,env, policy_fn, *,
                 loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)
                 if args.has_d_final==1:
                     # update final discriminator
-                    ob_expert, _ = env.get_expert(optim_batchsize,is_final=True,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
-                    ob_adjs,ob_nodes=traj_final_generator(pi,env,optim_batchsize,True)
                     # loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg["ob_adj_final"], seg["ob_node_final"])
                     loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], ob_adjs, ob_nodes)
                     adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
