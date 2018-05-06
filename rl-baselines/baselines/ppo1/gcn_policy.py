@@ -389,8 +389,8 @@ class GCNPolicy_scaffold(object):
         ob = {'adj': U.get_placeholder(name="adj", dtype=tf.float32, shape=[None,ob_space['adj'].shape[0],None,None]),
               'node': U.get_placeholder(name="node", dtype=tf.float32, shape=[None,1,None,ob_space['node'].shape[2]])}
         ob_scaffold = {
-            'adj': U.get_placeholder(name="adj", dtype=tf.float32, shape=[None, ob_space['adj'].shape[0], None, None]),
-            'node': U.get_placeholder(name="node", dtype=tf.float32, shape=[None, 1, None, ob_space['node'].shape[2]])}
+            'adj': U.get_placeholder(name="adj_scaffold", dtype=tf.float32, shape=[None, ob_space['adj'].shape[0], None, None]),
+            'node': U.get_placeholder(name="node_scaffold", dtype=tf.float32, shape=[None, 1, None, ob_space['node'].shape[2]])}
 
         # only when evaluating given action, at training time
         self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,4]) # feed groudtruth action

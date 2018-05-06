@@ -221,11 +221,11 @@ class MoleculeEnv(gym.Env):
                     # reward_logp += MolLogP(self.mol)/10 * self.logp_ratio
                     reward_logp += reward_penalized_log_p(final_mol) * self.logp_ratio
                     if self.reward_type == 'logppen':
-                        reward_final += reward_penalized_log_p(final_mol)/5
+                        reward_final += reward_penalized_log_p(final_mol)/3
                     elif self.reward_type == 'logp_target':
                         reward_final += reward_target_logp(final_mol,target=self.reward_target)
                     elif self.reward_type == 'qed':
-                        reward_final += reward_qed
+                        reward_final += reward_qed*2
                     elif self.reward_type == 'qedsa':
                         reward_final += reward_qed + reward_sa
                     elif self.reward_type == 'qed_target':
@@ -1320,7 +1320,7 @@ def reward_target_penalizelogp(mol, target,ratio=3,max=2):
     reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
-def reward_target_qed(mol, target,ratio=0.3,max=2):
+def reward_target_qed(mol, target,ratio=0.05,max=2):
     """
     Reward for a target log p
     :param mol: rdkit mol object
@@ -1331,7 +1331,7 @@ def reward_target_qed(mol, target,ratio=0.3,max=2):
     reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
-def reward_target_mw(mol, target,ratio=20,max=2):
+def reward_target_mw(mol, target,ratio=30,max=2):
     """
     Reward for a target molecular weight
     :param mol: rdkit mol object
