@@ -499,6 +499,7 @@ def learn(args,env, policy_fn, *,
 
     U.initialize()
     adam_pi.sync()
+    adam_pi_stop.sync()
     adam_d_step.sync()
     adam_d_final.sync()
 
@@ -567,6 +568,7 @@ def learn(args,env, policy_fn, *,
         loss_d_final=0
         g_ppo=0
         g_d_step=0
+        g_d_final=0
         # if args.has_rl==1:
         if iters_so_far>=args.rl_start and iters_so_far<=args.rl_end:
             ## PPO train
@@ -578,16 +580,6 @@ def learn(args,env, policy_fn, *,
                 ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,
                                               level_total=args.curriculum_num, level=level)
                 seg_final_adj, seg_final_node = traj_final_generator(pi, copy.deepcopy(env), optim_batchsize, True)
-
-                #
-                # seg_final = seg_gen_final.__next__()
-                # seg_final_adj = seg_final["ob_adj_final"]
-                # seg_final_node = seg_final["ob_node_final"]
-                # while seg_final_adj.shape[0]<optim_batchsize:
-                #     seg_final = seg_gen_final.__next__()
-                #     seg_final_adj = np.concatenate((seg_final_adj,seg_final["ob_adj_final"]),axis=0)
-                #     seg_final_node = np.concatenate((seg_final_node,seg_final["ob_node_final"]),axis=0)
-                # print('len_final',seg_final_adj.shape[0])
             for _ in range(optim_epochs):
                 losses_ppo = [] # list of tuples, each of which gives the loss for a minibatch
                 losses_d_step = []
@@ -643,9 +635,12 @@ def learn(args,env, policy_fn, *,
             writer.add_scalar('grad_rl_min', np.amin(g_ppo), iters_so_far)
             writer.add_scalar('grad_rl_max', np.amax(g_ppo), iters_so_far)
             writer.add_scalar('grad_rl_norm', np.linalg.norm(g_ppo), iters_so_far)
-            writer.add_scalar('grad_discriminator_min', np.amin(g_d_step), iters_so_far)
-            writer.add_scalar('grad_discriminator_max', np.amax(g_d_step), iters_so_far)
-            writer.add_scalar('grad_discriminator_norm', np.linalg.norm(g_d_step), iters_so_far)
+            writer.add_scalar('g_d_step_min', np.amin(g_d_step), iters_so_far)
+            writer.add_scalar('g_d_step_max', np.amax(g_d_step), iters_so_far)
+            writer.add_scalar('g_d_step_norm', np.linalg.norm(g_d_step), iters_so_far)
+            writer.add_scalar('g_d_final_min', np.amin(g_d_final), iters_so_far)
+            writer.add_scalar('g_d_final_max', np.amax(g_d_final), iters_so_far)
+            writer.add_scalar('g_d_final_norm', np.linalg.norm(g_d_final), iters_so_far)
             writer.add_scalar('learning_rate', optim_stepsize * cur_lrmult, iters_so_far)
 
         for (lossval, name) in zipsame(meanlosses, loss_names):
