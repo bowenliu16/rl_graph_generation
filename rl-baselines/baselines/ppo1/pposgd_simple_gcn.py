@@ -468,6 +468,7 @@ def learn(args,env, policy_fn, *,
 
 
     seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
+    seg_gen_final = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
 
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
@@ -561,10 +562,17 @@ def learn(args,env, policy_fn, *,
             # logger.log(fmt_row(13, loss_names))
             # Here we do a bunch of optimization epochs over the data
             if args.has_d_final == 1:
-                ob_adjs, ob_nodes = traj_final_generator(pi, env, optim_batchsize, True)
-                ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,
-                                              level_total=args.curriculum_num, level=level)
-
+                # ob_adjs, ob_nodes = traj_final_generator(pi, env, optim_batchsize, True)
+                # ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,
+                #                               level_total=args.curriculum_num, level=level)
+                seg_final = seg_gen_final.__next__()
+                seg_final_adj = seg_final["ob_adj_final"]
+                seg_final_node = seg_final["ob_node_final"]
+                while seg_final_adj.shape[0]<optim_batchsize:
+                    seg_final = seg_gen_final.__next__()
+                    seg_final_adj = np.concatenate((seg_final_adj,seg_final["ob_adj_final"]),axis=0)
+                    seg_final_node = np.concatenate((seg_final_node,seg_final["ob_node_final"]),axis=0)
+                print('len_final',seg_final_adj.shape[0])
             for _ in range(optim_epochs):
                 losses_ppo = [] # list of tuples, each of which gives the loss for a minibatch
                 losses_d_step = []
@@ -584,8 +592,8 @@ def learn(args,env, policy_fn, *,
                 loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)
                 if args.has_d_final==1:
                     # update final discriminator
-                    # loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg["ob_adj_final"], seg["ob_node_final"])
-                    loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], ob_adjs, ob_nodes)
+                    loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg_final_adj, seg_final_node)
+                    # loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], ob_adjs, ob_nodes)
                     adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
                     # print(seg["ob_adj_final"].shape)
                     # logger.log(fmt_row(13, np.mean(losses, axis=0)))
