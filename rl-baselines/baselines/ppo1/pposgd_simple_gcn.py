@@ -10,6 +10,8 @@ from collections import deque
 from tensorboardX import SummaryWriter
 from baselines.ppo1.gcn_policy import discriminator,discriminator_net
 import os
+import copy
+
 
 def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_final_func):
     t = 0
@@ -479,7 +481,7 @@ def learn(args,env, policy_fn, *,
 
 
     seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
-    seg_gen_final = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
+    # seg_gen_final = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
 
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
@@ -575,17 +577,17 @@ def learn(args,env, policy_fn, *,
             if args.has_d_final == 1:
                 ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,
                                               level_total=args.curriculum_num, level=level)
-                seg_final_adj, seg_final_node = traj_final_generator(pi, env, optim_batchsize, True)
+                seg_final_adj, seg_final_node = traj_final_generator(pi, copy.deepcopy(env), optim_batchsize, True)
 
                 #
                 # seg_final = seg_gen_final.__next__()
                 # seg_final_adj = seg_final["ob_adj_final"]
                 # seg_final_node = seg_final["ob_node_final"]
-                while seg_final_adj.shape[0]<optim_batchsize:
-                    seg_final = seg_gen_final.__next__()
-                    seg_final_adj = np.concatenate((seg_final_adj,seg_final["ob_adj_final"]),axis=0)
-                    seg_final_node = np.concatenate((seg_final_node,seg_final["ob_node_final"]),axis=0)
-                print('len_final',seg_final_adj.shape[0])
+                # while seg_final_adj.shape[0]<optim_batchsize:
+                #     seg_final = seg_gen_final.__next__()
+                #     seg_final_adj = np.concatenate((seg_final_adj,seg_final["ob_adj_final"]),axis=0)
+                #     seg_final_node = np.concatenate((seg_final_node,seg_final["ob_node_final"]),axis=0)
+                # print('len_final',seg_final_adj.shape[0])
             for _ in range(optim_epochs):
                 losses_ppo = [] # list of tuples, each of which gives the loss for a minibatch
                 losses_d_step = []
