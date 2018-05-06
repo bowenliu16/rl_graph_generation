@@ -405,12 +405,15 @@ def learn(args,env, policy_fn, *,
     loss_d_step_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_real, labels=tf.ones_like(step_logit_real)))
     loss_d_step_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_gen, labels=tf.zeros_like(step_logit_gen)))
     loss_d_step = loss_d_step_real+loss_d_step_gen
+    loss_g_step_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_gen, labels=tf.ones_like(step_logit_gen)))
 
     final_pred_real, final_logit_real = discriminator_net(ob_real, args, name='d_final')
     final_pred_gen, final_logit_gen = discriminator_net(ob_gen, args, name='d_final')
     loss_d_final_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_real, labels=tf.ones_like(final_logit_real)))
     loss_d_final_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_gen, labels=tf.zeros_like(final_logit_gen)))
     loss_d_final = loss_d_final_real+loss_d_final_gen
+    loss_g_final_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_gen, labels=tf.ones_like(final_logit_gen)))
+
 
     var_list_pi = pi.get_trainable_variables()
     var_list_pi_stop = [var for var in var_list_pi if ('emb' in var.name) or ('gcn' in var.name) or ('stop' in var.name)]
@@ -456,8 +459,8 @@ def learn(args,env, policy_fn, *,
     lossandgrad_expert_stop = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi_stop)])
     lossandgrad_d_step = U.function([ob_real['adj'], ob_real['node'], ob_gen['adj'], ob_gen['node']], [loss_d_step, U.flatgrad(loss_d_step, var_list_d_step)])
     lossandgrad_d_final = U.function([ob_real['adj'], ob_real['node'], ob_gen['adj'], ob_gen['node']], [loss_d_final, U.flatgrad(loss_d_final, var_list_d_final)])
-    loss_d_gen_step_func = U.function([ob_gen['adj'], ob_gen['node']], loss_d_step_gen)
-    loss_d_gen_final_func = U.function([ob_gen['adj'], ob_gen['node']], loss_d_final_gen)
+    loss_g_gen_step_func = U.function([ob_gen['adj'], ob_gen['node']], loss_g_step_gen)
+    loss_g_gen_final_func = U.function([ob_gen['adj'], ob_gen['node']], loss_g_final_gen)
 
 
 
@@ -492,8 +495,7 @@ def learn(args,env, policy_fn, *,
     rewbuffer_final_stat = deque(maxlen=100) # rolling buffer for episode rewardsn
 
 
-    seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
-    # seg_gen_final = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
+    seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_g_gen_step_func,loss_g_gen_final_func)
 
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
@@ -720,7 +722,6 @@ def learn(args,env, policy_fn, *,
         counter += 1
         if counter%args.curriculum_step and counter//args.curriculum_step<args.curriculum_num:
             level += 1
-            # seg_gen = traj_segment_generator(args, pi, env, timesteps_per_actorbatch, True, loss_d_gen_step_func,loss_d_gen_final_func)
 
 
 
