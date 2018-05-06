@@ -80,7 +80,7 @@ def molecule_arg_parser():
     parser.add_argument('--qed_ratio', type=float, default=1)
     parser.add_argument('--sa_ratio', type=float, default=1)
     parser.add_argument('--gan_step_ratio', type=float, default=1)
-    parser.add_argument('--gan_final_ratio', type=float, default=2)
+    parser.add_argument('--gan_final_ratio', type=float, default=5)
     parser.add_argument('--reward_step_total', type=float, default=0.5)
     parser.add_argument('--lr', type=float, default=1e-3)
     # parser.add_argument('--has_rl', type=int, default=1)
@@ -108,7 +108,7 @@ def molecule_arg_parser():
     parser.add_argument('--has_concat', type=int, default=0)
     parser.add_argument('--emb_size', type=int, default=64)
     parser.add_argument('--gcn_aggregate', type=str, default='mean')# sum, mean, concat
-    parser.add_argument('--gate_sum_d', type=int, default=1)
+    parser.add_argument('--gate_sum_d', type=int, default=0)
     parser.add_argument('--name_full',type=str,default='')
     parser.add_argument('--name_full_load',type=str,default='')
 
