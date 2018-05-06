@@ -755,7 +755,7 @@ def learn(args,env, policy_fn, *,
 
 
 # scaffold
-def learn(args,env, policy_fn, *,
+def learn_scaffold(args,env, policy_fn, *,
         timesteps_per_actorbatch, # timesteps per actor per update
         clip_param, entcoeff, # clipping parameter epsilon, entropy coeff
         optim_epochs, optim_stepsize, optim_batchsize,# optimization hypers
