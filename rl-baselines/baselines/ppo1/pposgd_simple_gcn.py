@@ -151,8 +151,8 @@ def traj_final_generator(pi, env, batch_size, stochastic):
             ac, vpred, debug = pi.act(stochastic, ob)
             ob, rew_env, new, info = env.step(ac)
             np.set_printoptions(precision=2, linewidth=200)
-            print('ac',ac)
-            print('ob',ob['adj'],ob['node'])
+            # print('ac',ac)
+            # print('ob',ob['adj'],ob['node'])
             if new:
                 ob_adjs[i]=ob['adj']
                 ob_nodes[i]=ob['node']
