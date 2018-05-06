@@ -99,12 +99,12 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
             # add stepwise discriminator reward
             if args.has_d_step==1:
                 rew_d_step = args.gan_step_ratio * (
-                    1 - d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0]) / env.max_atom
+                    d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0]) / env.max_atom
         rew_d_final = 0 # default
         if new:
             if args.has_d_final==1:
                 rew_d_final = args.gan_final_ratio * (
-                    1 - d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0])
+                    d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])[0])
 
         rews[i] = rew_d_step + rew_env +rew_d_final
 
@@ -442,8 +442,8 @@ def learn(args,env, policy_fn, *,
     lossandgrad_ppo = U.function([ob['adj'], ob['node'], ac, pi.ac_real, oldpi.ac_real, atarg, ret, lrmult], losses + [U.flatgrad(total_loss, var_list_pi)])
     lossandgrad_expert = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi)])
     lossandgrad_expert_stop = U.function([ob['adj'], ob['node'], ac, pi.ac_real], [loss_expert, U.flatgrad(loss_expert, var_list_pi_stop)])
-    lossandgrad_d_step = U.function([ob_real['adj'], ob_real['node'], ob_gen['adj'], ob_gen['node']], [loss_d_step, U.flatgrad(loss_d_step, var_list_d_step)])
-    lossandgrad_d_final = U.function([ob_real['adj'], ob_real['node'], ob_gen['adj'], ob_gen['node']], [loss_d_final, U.flatgrad(loss_d_final, var_list_d_final)])
+    lossandgrad_d_step = U.function([ob_real['adj'], ob_real['node'], ob_gen['adj'], ob_gen['node']], [loss_d_step, U.flatgrad(-loss_d_step, var_list_d_step)])
+    lossandgrad_d_final = U.function([ob_real['adj'], ob_real['node'], ob_gen['adj'], ob_gen['node']], [loss_d_final, U.flatgrad(-loss_d_final, var_list_d_final)])
     loss_d_gen_step_func = U.function([ob_gen['adj'], ob_gen['node']], loss_d_gen_step)
     loss_d_gen_final_func = U.function([ob_gen['adj'], ob_gen['node']], loss_d_gen_final)
 
@@ -604,6 +604,11 @@ def learn(args,env, policy_fn, *,
                     adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
                     # print(seg["ob_adj_final"].shape)
                     # logger.log(fmt_row(13, np.mean(losses, axis=0)))
+
+        if args.has_d_step == 1:
+            clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_d_step]
+        if args.has_d_final == 1:
+            clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_d_final]
 
 
         ## PPO val
