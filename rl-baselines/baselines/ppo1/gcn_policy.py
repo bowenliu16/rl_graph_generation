@@ -123,11 +123,14 @@ def emb_node(ob_node,out_channels):
 def discriminator_net(ob,args,name='d_net'):
     with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
         ob_node = tf.layers.dense(ob['node'], 8, activation=None, use_bias=False, name='emb')  # embedding layer
-        emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1',aggregate=args.gcn_aggregate)
-        emb_node2 = GCN_batch(ob['adj'], emb_node1, 32, is_act=False, is_normalize=True, name='gcn2',aggregate=args.gcn_aggregate)
+        emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
+        emb_node1 = GCN_batch(ob['adj'], emb_node1, args.emb_size, name='gcn2',aggregate=args.gcn_aggregate)
+        emb_node2 = GCN_batch(ob['adj'], emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn3',aggregate=args.gcn_aggregate)
         # emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
+        emb_node2 = tf.layers.dense(emb_node2, args.emb_size, activation=tf.nn.relu, name='linear1')
+
         emb_graph = tf.reduce_sum(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
-        logit = tf.layers.dense(emb_graph, 1, activation=None, name='linear1')
+        logit = tf.layers.dense(emb_graph, 1, activation=None, name='linear2')
         pred = tf.sigmoid(logit)
         # pred = tf.layers.dense(emb_graph, 1, activation=None, name='linear1')
         return pred,logit
