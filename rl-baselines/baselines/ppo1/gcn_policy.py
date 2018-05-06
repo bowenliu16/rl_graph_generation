@@ -125,10 +125,10 @@ def discriminator_net(ob,args,name='d_net'):
         ob_node = tf.layers.dense(ob['node'], 8, activation=None, use_bias=False, name='emb')  # embedding layer
         emb_node1 = GCN_batch(ob['adj'], ob_node, 32, name='gcn1',aggregate=args.gcn_aggregate)
         emb_node2 = GCN_batch(ob['adj'], emb_node1, 32, is_act=False, is_normalize=True, name='gcn2',aggregate=args.gcn_aggregate)
-        emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
-        # emb_graph = tf.reduce_sum(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
-        # pred = tf.layers.dense(emb_graph, 1, activation=tf.nn.sigmoid, name='linear1')
-        pred = tf.layers.dense(emb_graph, 1, activation=None, name='linear1')
+        # emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
+        emb_graph = tf.reduce_sum(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
+        pred = tf.layers.dense(emb_graph, 1, activation=tf.nn.sigmoid, name='linear1')
+        # pred = tf.layers.dense(emb_graph, 1, activation=None, name='linear1')
         return pred
 
 def discriminator(x,x_gen,args,name='d_net'):
