@@ -148,6 +148,9 @@ def traj_final_generator(pi, env, batch_size, stochastic):
         while True:
             ac, vpred, debug = pi.act(stochastic, ob)
             ob, rew_env, new, info = env.step(ac)
+            np.set_printoptions(precision=2, linewidth=200)
+            print('ac',ac)
+            print('ob',ob['adj'],ob['node'])
             if new:
                 ob_adjs[i]=ob['adj']
                 ob_nodes[i]=ob['node']
@@ -161,6 +164,8 @@ def traj_segment_generator_scaffold(args, pi, env, horizon, stochastic, d_step_f
     ob = env.reset()
     ob_adj = ob['adj']
     ob_node = ob['node']
+    ob_adj_scaffold = ob['adj_scaffold']
+    ob_node_scaffold = ob['node_scaffold']
 
     cur_ep_ret = 0 # return in current episode
     cur_ep_ret_env = 0
@@ -183,8 +188,12 @@ def traj_segment_generator_scaffold(args, pi, env, horizon, stochastic, d_step_f
     # obs = np.array([ob for _ in range(horizon)])
     ob_adjs = np.array([ob_adj for _ in range(horizon)])
     ob_nodes = np.array([ob_node for _ in range(horizon)])
+    ob_adjs_scaffold = np.array([ob_adj_scaffold for _ in range(horizon)])
+    ob_nodes_scaffold = np.array([ob_node_scaffold for _ in range(horizon)])
     ob_adjs_final = []
     ob_nodes_final = []
+    ob_adjs_scaffold_final = []
+    ob_nodes_scaffold_final = []
     rews = np.zeros(horizon, 'float32')
     vpreds = np.zeros(horizon, 'float32')
     news = np.zeros(horizon, 'int32')
@@ -223,6 +232,8 @@ def traj_segment_generator_scaffold(args, pi, env, horizon, stochastic, d_step_f
             ep_rets_env = []
             ob_adjs_final = []
             ob_nodes_final = []
+            ob_adjs_scaffold_final = []
+            ob_nodes_scaffold_final = []
 
         i = t % horizon
         # obs[i] = ob
@@ -562,12 +573,14 @@ def learn(args,env, policy_fn, *,
             # logger.log(fmt_row(13, loss_names))
             # Here we do a bunch of optimization epochs over the data
             if args.has_d_final == 1:
-                # ob_adjs, ob_nodes = traj_final_generator(pi, env, optim_batchsize, True)
-                # ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,
-                #                               level_total=args.curriculum_num, level=level)
-                seg_final = seg_gen_final.__next__()
-                seg_final_adj = seg_final["ob_adj_final"]
-                seg_final_node = seg_final["ob_node_final"]
+                ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,
+                                              level_total=args.curriculum_num, level=level)
+                seg_final_adj, seg_final_node = traj_final_generator(pi, env, optim_batchsize, True)
+
+                #
+                # seg_final = seg_gen_final.__next__()
+                # seg_final_adj = seg_final["ob_adj_final"]
+                # seg_final_node = seg_final["ob_node_final"]
                 while seg_final_adj.shape[0]<optim_batchsize:
                     seg_final = seg_gen_final.__next__()
                     seg_final_adj = np.concatenate((seg_final_adj,seg_final["ob_adj_final"]),axis=0)
