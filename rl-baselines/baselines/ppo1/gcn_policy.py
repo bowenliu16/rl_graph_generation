@@ -165,28 +165,20 @@ class GCNPolicy(object):
               'node': U.get_placeholder(name="node", dtype=tf.float32, shape=[None,1,None,ob_space['node'].shape[2]])}
         # only when evaluating given action, at training time
         self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,4]) # feed groudtruth action
-        if kind == 'small':
-            ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
-            if args.has_concat==1:
-                self.emb_node1 = tf.concat((GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate),ob_node),axis=-1)
-            else:
-                self.emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
-            for i in range(args.layer_num-2):
-                if args.has_residual==1:
-                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate)+self.emb_node1
-                elif args.has_concat==1:
-                    self.emb_node1 = tf.concat((GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate),self.emb_node1),axis=-1)
-                else:
-                    self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_' + str(i + 1),aggregate=args.gcn_aggregate)
-            self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn2',aggregate=args.gcn_aggregate)
-            emb_node = tf.squeeze(self.emb_node2,axis=1)  # B*n*f
-            emb_graph = tf.reduce_max(emb_node,axis=1,keepdims=True)
-            if args.graph_emb==1:
-                emb_graph = tf.tile(emb_graph, [1, tf.shape(emb_node)[1], 1])
-                emb_node = tf.concat([emb_node,emb_graph],axis=2)
-
+        ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
+        if args.has_concat==1:
+            self.emb_node1 = tf.concat((GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate),ob_node),axis=-1)
         else:
-            raise NotImplementedError
+            self.emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
+        for i in range(args.layer_num-2):
+            if args.has_residual==1:
+                self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate)+self.emb_node1
+            elif args.has_concat==1:
+                self.emb_node1 = tf.concat((GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate),self.emb_node1),axis=-1)
+            else:
+                self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_' + str(i + 1),aggregate=args.gcn_aggregate)
+        self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn2',aggregate=args.gcn_aggregate)
+        emb_node = tf.squeeze(self.emb_node2,axis=1)  # B*n*f
 
         ### 1 only keep effective nodes
         # ob_mask = tf.cast(tf.transpose(tf.reduce_sum(ob['node'],axis=-1),[0,2,1]),dtype=tf.bool) # B*n*1
@@ -198,6 +190,12 @@ class GCNPolicy(object):
         if args.mask_null==1:
             emb_node_null = tf.zeros(tf.shape(emb_node))
             emb_node = tf.where(condition=tf.tile(tf.expand_dims(logits_mask,axis=-1),(1,1,emb_node.get_shape()[-1])), x=emb_node, y=emb_node_null)
+
+        ## get graph embedding
+        emb_graph = tf.reduce_max(emb_node, axis=1, keepdims=True)
+        if args.graph_emb == 1:
+            emb_graph = tf.tile(emb_graph, [1, tf.shape(emb_node)[1], 1])
+            emb_node = tf.concat([emb_node, emb_graph], axis=2)
 
         ### 2 predict stop
         self.logits_stop = tf.reduce_sum(tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_stop1'),axis=1)
