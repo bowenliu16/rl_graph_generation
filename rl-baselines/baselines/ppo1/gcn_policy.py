@@ -197,7 +197,7 @@ class GCNPolicy(object):
 
         if args.mask_null==1:
             emb_node_null = tf.zeros(tf.shape(emb_node))
-            emb_node = tf.where(condition=logits_mask, x=emb_node, y=emb_node_null)
+            emb_node = tf.where(condition=tf.tile(tf.expand_dims(logits_mask,axis=-1),(1,1,emb_node.get_shape()[-1])), x=emb_node, y=emb_node_null)
 
         ### 2 predict stop
         self.logits_stop = tf.reduce_sum(tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_stop1'),axis=1)
