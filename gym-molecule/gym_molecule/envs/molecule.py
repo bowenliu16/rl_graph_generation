@@ -225,7 +225,7 @@ class MoleculeEnv(gym.Env):
                     elif self.reward_type == 'logp_target':
                         reward_final += reward_target_logp(final_mol,target=self.reward_target)
                     elif self.reward_type == 'qed':
-                        reward_final += reward_qed*4
+                        reward_final += reward_qed
                     elif self.reward_type == 'qedsa':
                         reward_final += (reward_qed + reward_sa)*2
                     elif self.reward_type == 'qed_target':
