@@ -99,12 +99,12 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
             # add stepwise discriminator reward
             if args.has_d_step==1:
                 rew_d_step = args.gan_step_ratio * (
-                    4-d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])) / env.max_atom
+                    d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])) / env.max_atom
         rew_d_final = 0 # default
         if new:
             if args.has_d_final==1:
                 rew_d_final = args.gan_final_ratio * (
-                    4-d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :]))
+                    d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :]))
 
         rews[i] = rew_d_step + rew_env +rew_d_final
 
@@ -413,14 +413,14 @@ def learn(args,env, policy_fn, *,
     loss_d_step_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_real, labels=tf.ones_like(step_logit_real)*0.9))
     loss_d_step_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_gen, labels=tf.zeros_like(step_logit_gen)))
     loss_d_step = loss_d_step_real+loss_d_step_gen
-    loss_g_step_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_gen, labels=tf.ones_like(step_logit_gen)*0.9))
+    loss_g_step_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_gen, labels=tf.zeros_like(step_logit_gen)))
 
     final_pred_real, final_logit_real = discriminator_net(ob_real, args, name='d_final')
     final_pred_gen, final_logit_gen = discriminator_net(ob_gen, args, name='d_final')
     loss_d_final_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_real, labels=tf.ones_like(final_logit_real)*0.9))
     loss_d_final_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_gen, labels=tf.zeros_like(final_logit_gen)))
     loss_d_final = loss_d_final_real+loss_d_final_gen
-    loss_g_final_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_gen, labels=tf.ones_like(final_logit_gen)*0.9))
+    loss_g_final_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_gen, labels=tf.zeros_like(step_logit_gen)))
 
 
     var_list_pi = pi.get_trainable_variables()

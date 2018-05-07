@@ -1298,7 +1298,7 @@ def steric_strain_filter(mol, cutoff=0.82,
 
 ### TARGET VALUE REWARDS ###
 
-def reward_target_logp(mol, target,ratio=1,max=3):
+def reward_target_logp(mol, target,ratio=0.5,max=4):
     """
     Reward for a target log p
     :param mol: rdkit mol object
@@ -1309,7 +1309,7 @@ def reward_target_logp(mol, target,ratio=1,max=3):
     reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
-def reward_target_penalizelogp(mol, target,ratio=3,max=3):
+def reward_target_penalizelogp(mol, target,ratio=3,max=4):
     """
     Reward for a target log p
     :param mol: rdkit mol object
@@ -1320,7 +1320,7 @@ def reward_target_penalizelogp(mol, target,ratio=3,max=3):
     reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
-def reward_target_qed(mol, target,ratio=0.1,max=3):
+def reward_target_qed(mol, target,ratio=0.1,max=4):
     """
     Reward for a target log p
     :param mol: rdkit mol object
@@ -1331,7 +1331,7 @@ def reward_target_qed(mol, target,ratio=0.1,max=3):
     reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
-def reward_target_mw(mol, target,ratio=40,max=3):
+def reward_target_mw(mol, target,ratio=40,max=4):
     """
     Reward for a target molecular weight
     :param mol: rdkit mol object
