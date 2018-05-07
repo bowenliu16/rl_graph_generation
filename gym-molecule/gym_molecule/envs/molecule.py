@@ -225,9 +225,9 @@ class MoleculeEnv(gym.Env):
                     elif self.reward_type == 'logp_target':
                         reward_final += reward_target_logp(final_mol,target=self.reward_target)
                     elif self.reward_type == 'qed':
-                        reward_final += reward_qed*2
+                        reward_final += reward_qed*4
                     elif self.reward_type == 'qedsa':
-                        reward_final += reward_qed + reward_sa
+                        reward_final += (reward_qed + reward_sa)*2
                     elif self.reward_type == 'qed_target':
                         reward_final += reward_target_qed(final_mol, target=self.reward_target)
                     elif self.reward_type == 'mw_target':
@@ -1298,18 +1298,18 @@ def steric_strain_filter(mol, cutoff=0.82,
 
 ### TARGET VALUE REWARDS ###
 
-def reward_target_logp(mol, target,ratio=3,max=2):
+def reward_target_logp(mol, target,ratio=1,max=3):
     """
     Reward for a target log p
     :param mol: rdkit mol object
     :param target: float
     :return: float (-inf, max]
     """
-    x = Chem.Crippen.MolLogP(mol)
+    x = MolLogP(mol)
     reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
-def reward_target_penalizelogp(mol, target,ratio=3,max=2):
+def reward_target_penalizelogp(mol, target,ratio=3,max=3):
     """
     Reward for a target log p
     :param mol: rdkit mol object
@@ -1320,7 +1320,7 @@ def reward_target_penalizelogp(mol, target,ratio=3,max=2):
     reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
-def reward_target_qed(mol, target,ratio=0.05,max=2):
+def reward_target_qed(mol, target,ratio=0.1,max=3):
     """
     Reward for a target log p
     :param mol: rdkit mol object
@@ -1331,7 +1331,7 @@ def reward_target_qed(mol, target,ratio=0.05,max=2):
     reward = -1 * np.abs((x - target)/ratio) + max
     return reward
 
-def reward_target_mw(mol, target,ratio=30,max=2):
+def reward_target_mw(mol, target,ratio=40,max=3):
     """
     Reward for a target molecular weight
     :param mol: rdkit mol object
