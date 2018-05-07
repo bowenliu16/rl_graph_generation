@@ -196,7 +196,8 @@ class GCNPolicy(object):
         logits_first_mask = tf.sequence_mask(ob_len_first,maxlen=tf.shape(ob['node'])[2]) # mask valid entry -3 (rm isolated nodes)
 
         if args.mask_null==1:
-            emb_node = tf.boolean_mask(emb_node,logits_mask)
+            emb_node_null = tf.zeros(tf.shape(emb_node))
+            emb_node = tf.where(condition=logits_mask, x=emb_node, y=emb_node_null)
 
         ### 2 predict stop
         self.logits_stop = tf.reduce_sum(tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_stop1'),axis=1)
