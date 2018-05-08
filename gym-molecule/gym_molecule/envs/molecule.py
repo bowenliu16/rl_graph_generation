@@ -51,7 +51,6 @@ def convert_radical_electrons_to_hydrogens(mol):
                 a.SetNumExplicitHs(num_radical_e)
     return m
 
-
 def load_scaffold():
     cwd = os.path.dirname(__file__)
     path = os.path.join(os.path.dirname(cwd), 'dataset',
@@ -89,6 +88,17 @@ class MoleculeEnv(gym.Env):
         elif data_type=='zinc':
             possible_atoms = ['C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
                               'Br']  # ZINC
+        self.possible_formal_charge = np.array([-1, 0, 1])
+        self.possible_implicit_valence = np.array([0, 1, 2, 3, 4])
+        self.possible_ring_atom = np.array([True, False])
+        self.possible_degree = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+        self.possible_hybridization = np.array([
+            Chem.rdchem.HybridizationType.SP,
+                                  Chem.rdchem.HybridizationType.SP2,
+                                  Chem.rdchem.HybridizationType.SP3,
+                                  Chem.rdchem.HybridizationType.SP3D,
+                                  Chem.rdchem.HybridizationType.SP3D2],
+            dtype=object)
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.atom_type_num = len(possible_atoms)
@@ -466,60 +476,83 @@ class MoleculeEnv(gym.Env):
     #     info['sa_ratio'] = self.sa_ratio
     #     return info
 
-    def get_matrices(self):
-        """
-        Get the adjacency matrix, edge feature matrix and, node feature matrix
-        of the current molecule graph
-        :return: np arrays: adjacency matrix, dim n x n; edge feature matrix,
-        dim n x n x d_e; node feature matrix, dim n x d_n
-        """
-        A_no_diag = Chem.GetAdjacencyMatrix(self.mol)
-        A = A_no_diag + np.eye(*A_no_diag.shape)
-
-        n = A.shape[0]
-
-        d_n = len(self.possible_atom_types)
-        F = np.zeros((n, d_n))
-        for a in self.mol.GetAtoms():
-            atom_idx = a.GetIdx()
-            atom_symbol = a.GetSymbol()
-            float_array = (atom_symbol == self.possible_atom_types).astype(float)
-            assert float_array.sum() != 0
-            F[atom_idx, :] = float_array
-
-        d_e = len(self.possible_bond_types)
-        E = np.zeros((n, n, d_e))
-        for b in self.mol.GetBonds():
-            begin_idx = b.GetBeginAtomIdx()
-            end_idx = b.GetEndAtomIdx()
-            bond_type = b.GetBondType()
-            float_array = (bond_type == self.possible_bond_types).astype(float)
-            assert float_array.sum() != 0
-            E[begin_idx, end_idx, :] = float_array
-            E[end_idx, begin_idx, :] = float_array
-
-        return A, E, F
+    # def get_matrices(self):
+    #     """
+    #     Get the adjacency matrix, edge feature matrix and, node feature matrix
+    #     of the current molecule graph
+    #     :return: np arrays: adjacency matrix, dim n x n; edge feature matrix,
+    #     dim n x n x d_e; node feature matrix, dim n x d_n
+    #     """
+    #     A_no_diag = Chem.GetAdjacencyMatrix(self.mol)
+    #     A = A_no_diag + np.eye(*A_no_diag.shape)
+    #
+    #     n = A.shape[0]
+    #
+    #     d_n = len(self.possible_atom_types)
+    #     F = np.zeros((n, d_n))
+    #     for a in self.mol.GetAtoms():
+    #         atom_idx = a.GetIdx()
+    #         atom_symbol = a.GetSymbol()
+    #         float_array = (atom_symbol == self.possible_atom_types).astype(float)
+    #         assert float_array.sum() != 0
+    #         F[atom_idx, :] = float_array
+    #
+    #     d_e = len(self.possible_bond_types)
+    #     E = np.zeros((n, n, d_e))
+    #     for b in self.mol.GetBonds():
+    #         begin_idx = b.GetBeginAtomIdx()
+    #         end_idx = b.GetEndAtomIdx()
+    #         bond_type = b.GetBondType()
+    #         float_array = (bond_type == self.possible_bond_types).astype(float)
+    #         assert float_array.sum() != 0
+    #         E[begin_idx, end_idx, :] = float_array
+    #         E[end_idx, begin_idx, :] = float_array
+    #
+    #     return A, E, F
 
     def get_observation(self):
         """
-        ob['adj']:b*n*n --- 'E'
-        ob['node']:1*n*m --- 'F'
+        ob['adj']:d_e*n*n --- 'E'
+        ob['node']:1*n*d_n --- 'F'
         n = atom_num + atom_type_num
         """
 
         n = self.mol.GetNumAtoms()
         n_shift = len(self.possible_atom_types) # assume isolated nodes new nodes exist
 
-        d_n = len(self.possible_atom_types)
+        d_n = len(self.possible_atom_types) + len(
+            self.possible_formal_charge) + len(
+            self.possible_implicit_valence) + len(self.possible_ring_atom) + \
+              len(self.possible_degree) + len(self.possible_hybridization)
         F = np.zeros((1, self.max_atom, d_n))
         for a in self.mol.GetAtoms():
             atom_idx = a.GetIdx()
             atom_symbol = a.GetSymbol()
-            float_array = (atom_symbol == self.possible_atom_types).astype(float)
-            assert float_array.sum() != 0
+            formal_charge = a.GetFormalCharge()
+            implicit_valence = a.GetImplicitValence()
+            ring_atom = a.IsInRing()
+            degree = a.GetDegree()
+            hybridization = a.GetHybridization()
+            float_array = np.concatenate([(atom_symbol ==
+                                           self.possible_atom_types),
+                                          (formal_charge ==
+                                           self.possible_formal_charge),
+                                          (implicit_valence ==
+                                           self.possible_implicit_valence),
+                                          (ring_atom ==
+                                           self.possible_ring_atom),
+                                          (degree == self.possible_degree),
+                                          (hybridization ==
+                                           self.possible_hybridization)]).astype(float)
+            assert float_array.sum() == 6   # because there are 6 types of one
+            # hot atom features
             F[0, atom_idx, :] = float_array
-        temp = F[0,n:n+n_shift,:]
-        F[0,n:n+n_shift,:] = np.eye(n_shift)
+        # add the atom features for the auxiliary atoms. We only include the
+        # atom symbol features
+        auxiliary_atom_features = np.zeros((n_shift, d_n)) # for padding
+        temp = np.eye(n_shift)
+        auxiliary_atom_features[:temp.shape[0], :temp.shape[1]] = temp
+        F[0,n:n+n_shift,:] = auxiliary_atom_features
 
         d_e = len(self.possible_bond_types)
         E = np.zeros((d_e, self.max_atom, self.max_atom))
@@ -1483,7 +1516,25 @@ def reward_penalized_log_p(mol):
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
     # env = GraphEnv()
-    env.init(has_scaffold=True)
+    # env.init(has_scaffold=True)
+
+    ## debug
+    print('debug')
+    m_env = MoleculeEnv()
+    m_env.init(data_type='zinc')
+    # add test mol
+    rw_mol = Chem.RWMol(Chem.MolFromSmiles('c1ccc(cc1)O'))
+    Chem.SanitizeMol(rw_mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+    m_env.mol = rw_mol
+    print(m_env.get_final_smiles())
+    np.set_printoptions(threshold=np.nan)
+    print(m_env.get_observation()['node'])
+    print(m_env.get_observation()['node'].shape) # dim d_e x n x n
+    print(m_env.get_observation()['adj'])
+    print(m_env.get_observation()['adj'].shape) # dim 1 x n x d_n
+
+
+    ## end debug
 
 
     # ob = env.reset()
@@ -1498,12 +1549,12 @@ if __name__ == '__main__':
 
     # ob,ac = env.get_expert(5)
 
-    ob = env.get_observation_scaffold()
-    print(ob['adj'].shape)
-    print(ob['node'].shape)
-    for i in range(10):
-        print(ob['adj'][i])
-        print(ob['node'][i])
+    # ob = env.get_observation_scaffold()
+    # print(ob['adj'].shape)
+    # print(ob['node'].shape)
+    # for i in range(10):
+    #     print(ob['adj'][i])
+    #     print(ob['node'][i])
 
     # print('ob',ob)
 
@@ -1512,7 +1563,7 @@ if __name__ == '__main__':
     # print(ob['node'].shape)
     #
     # ob,ac = env.get_expert(5)
-    np.set_printoptions(precision=2,linewidth=200)
+    # np.set_printoptions(precision=2,linewidth=200)
     # for j in range(10):
     #     print('-------------------------------')
     #     for i in range(ob['adj'].shape[-1]):
