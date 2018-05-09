@@ -142,9 +142,9 @@ def discriminator_net(ob,args,name='d_net'):
 
         if args.gate_sum_d==1:
             emb_node_gate = tf.layers.dense(emb_node,1,activation=tf.nn.sigmoid,name='gate')
-            emb_graph = tf.reduce_sum(tf.squeeze(emb_node*emb_node_gate, axis=1),axis=1)  # B*f
+            emb_graph = tf.reduce_sum(emb_node*emb_node_gate,axis=1)  # B*f
         else:
-            emb_graph = tf.reduce_sum(tf.squeeze(emb_node, axis=1), axis=1)  # B*f
+            emb_graph = tf.reduce_sum(emb_node, axis=1)  # B*f
         logit = tf.layers.dense(emb_graph, 1, activation=None, name='linear2')
         pred = tf.sigmoid(logit)
         # pred = tf.layers.dense(emb_graph, 1, activation=None, name='linear1')
