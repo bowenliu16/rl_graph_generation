@@ -182,7 +182,7 @@ class GCNPolicy(object):
 
         ### 1 only keep effective nodes
         # ob_mask = tf.cast(tf.transpose(tf.reduce_sum(ob['node'],axis=-1),[0,2,1]),dtype=tf.bool) # B*n*1
-        ob_len = tf.reduce_sum(tf.squeeze(tf.reduce_sum(ob['node'], axis=-1),axis=-2),axis=-1)  # B
+        ob_len = tf.reduce_sum(tf.squeeze(tf.cast(tf.cast(tf.reduce_sum(ob['node'], axis=-1),dtype=tf.bool),dtype=tf.float32),axis=-2),axis=-1)  # B
         ob_len_first = ob_len-atom_type_num
         logits_mask = tf.sequence_mask(ob_len, maxlen=tf.shape(ob['node'])[2]) # mask all valid entry
         logits_first_mask = tf.sequence_mask(ob_len_first,maxlen=tf.shape(ob['node'])[2]) # mask valid entry -3 (rm isolated nodes)

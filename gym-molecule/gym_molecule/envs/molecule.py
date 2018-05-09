@@ -629,7 +629,11 @@ class MoleculeEnv(gym.Env):
         ob = {}
         atom_type_num = len(self.possible_atom_types)
         bond_type_num = len(self.possible_bond_types)
-        ob['node'] = np.zeros((batch_size, 1, self.max_atom, atom_type_num))
+        d_n = len(self.possible_atom_types) + len(
+            self.possible_formal_charge) + len(
+            self.possible_implicit_valence) + len(self.possible_ring_atom) + \
+              len(self.possible_degree) + len(self.possible_hybridization)
+        ob['node'] = np.zeros((batch_size, 1, self.max_atom, d_n))
         ob['adj'] = np.zeros((batch_size, bond_type_num, self.max_atom, self.max_atom))
 
         ac = np.zeros((batch_size, 4))
@@ -699,13 +703,27 @@ class MoleculeEnv(gym.Env):
             # rw_mol = Chem.RWMol()
             n = graph_sub.number_of_nodes()
             for node_id, node in enumerate(graph_sub.nodes()):
-                float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
-                assert float_array.sum() != 0
+                # float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
+                float_array = np.concatenate([(graph.node[node]['symbol'] ==
+                                               self.possible_atom_types),
+                                              (graph.node[node]['formal_charge'] ==
+                                               self.possible_formal_charge),
+                                              (graph.node[node]['implicit_valence'] ==
+                                               self.possible_implicit_valence),
+                                              (graph.node[node]['ring_atom'] ==
+                                               self.possible_ring_atom),
+                                              (graph.node[node]['degree'] == self.possible_degree),
+                                              (graph.node[node]['hybridization'] ==
+                                               self.possible_hybridization)]).astype(float)
+                assert float_array.sum() == 6
                 ob['node'][i, 0, node_id, :] = float_array
                 # print('node',node_id,graph.node[node]['symbol'])
                 # atom = Chem.Atom(graph.node[node]['symbol'])
                 # rw_mol.AddAtom(atom)
-            ob['node'][i ,0, n:n + atom_type_num, :] = np.eye(atom_type_num)
+            auxiliary_atom_features = np.zeros((atom_type_num, d_n))  # for padding
+            temp = np.eye(atom_type_num)
+            auxiliary_atom_features[:temp.shape[0], :temp.shape[1]] = temp
+            ob['node'][i ,0, n:n + atom_type_num, :] = auxiliary_atom_features
 
             for j in range(bond_type_num):
                 ob['adj'][i, j, :n + atom_type_num, :n + atom_type_num] = np.eye(n + atom_type_num)
@@ -1522,16 +1540,25 @@ if __name__ == '__main__':
     print('debug')
     m_env = MoleculeEnv()
     m_env.init(data_type='zinc')
+
+    ob,ac = m_env.get_expert(batch_size=5)
+    np.set_printoptions(precision=2,linewidth=200)
+
+    # for i in range(ob['node'].shape[2]):
+    #     print(ob['node'][0,0,i])
+    # print('adj')
+    # for i in range(ob['adj'].shape[2]):
+    #     print(ob['adj'][0, 0, i])
     # add test mol
-    rw_mol = Chem.RWMol(Chem.MolFromSmiles('c1ccc(cc1)O'))
-    Chem.SanitizeMol(rw_mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
-    m_env.mol = rw_mol
-    print(m_env.get_final_smiles())
-    np.set_printoptions(threshold=np.nan)
-    print(m_env.get_observation()['node'])
-    print(m_env.get_observation()['node'].shape) # dim d_e x n x n
-    print(m_env.get_observation()['adj'])
-    print(m_env.get_observation()['adj'].shape) # dim 1 x n x d_n
+    # rw_mol = Chem.RWMol(Chem.MolFromSmiles('c1ccc(cc1)O'))
+    # Chem.SanitizeMol(rw_mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+    # m_env.mol = rw_mol
+    # print(m_env.get_final_smiles())
+    # np.set_printoptions(threshold=np.nan)
+    # print(m_env.get_observation()['node'])
+    # print(m_env.get_observation()['node'].shape) # dim d_e x n x n
+    # print(m_env.get_observation()['adj'])
+    # print(m_env.get_observation()['adj'].shape) # dim 1 x n x d_n
 
 
     ## end debug

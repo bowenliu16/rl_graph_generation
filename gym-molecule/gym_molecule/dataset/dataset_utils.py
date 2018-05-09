@@ -7,23 +7,42 @@ from rdkit import Chem
 from rdkit.Chem import GraphDescriptors
 import numpy as np
 
+# def mol_to_nx(mol):
+#     G = nx.Graph()
+#
+#     for atom in mol.GetAtoms():
+#         G.add_node(atom.GetIdx(),
+#                    symbol=atom.GetSymbol(),
+#                    atomic_num=atom.GetAtomicNum(),
+#                    formal_charge=atom.GetFormalCharge(),
+#                    chiral_tag=atom.GetChiralTag(),
+#                    hybridization=atom.GetHybridization(),
+#                    num_explicit_hs=atom.GetNumExplicitHs(),
+#                    is_aromatic=atom.GetIsAromatic())
+#     for bond in mol.GetBonds():
+#         G.add_edge(bond.GetBeginAtomIdx(),
+#                    bond.GetEndAtomIdx(),
+#                    bond_type=bond.GetBondType())
+#     return G
+
+
 def mol_to_nx(mol):
     G = nx.Graph()
 
     for atom in mol.GetAtoms():
         G.add_node(atom.GetIdx(),
                    symbol=atom.GetSymbol(),
-                   atomic_num=atom.GetAtomicNum(),
                    formal_charge=atom.GetFormalCharge(),
-                   chiral_tag=atom.GetChiralTag(),
-                   hybridization=atom.GetHybridization(),
-                   num_explicit_hs=atom.GetNumExplicitHs(),
-                   is_aromatic=atom.GetIsAromatic())
+                   implicit_valence=atom.GetImplicitValence(),
+                   ring_atom=atom.IsInRing(),
+                   degree=atom.GetDegree(),
+                   hybridization=atom.GetHybridization())
     for bond in mol.GetBonds():
         G.add_edge(bond.GetBeginAtomIdx(),
                    bond.GetEndAtomIdx(),
                    bond_type=bond.GetBondType())
     return G
+
 
 def nx_to_mol(G):
     mol = Chem.RWMol()
