@@ -114,6 +114,7 @@ class MoleculeEnv(gym.Env):
         elif data_type=='zinc':
             self.max_atom = 38 + len(possible_atoms) # ZINC
         self.max_action = 128
+        self.min_action = 20
         self.logp_ratio = logp_ratio
         self.qed_ratio = qed_ratio
         self.sa_ratio = sa_ratio
@@ -197,7 +198,7 @@ class MoleculeEnv(gym.Env):
 
         ### calculate terminal rewards
         # todo: add terminal action
-        if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop:
+        if (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop) and self.counter >= self.min_action:
             # default reward
             reward_valid = 2
             reward_qed = 0
