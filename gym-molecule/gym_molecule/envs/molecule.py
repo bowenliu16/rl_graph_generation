@@ -580,7 +580,7 @@ class MoleculeEnv(gym.Env):
         E = np.zeros((d_e, self.max_atom, self.max_atom))
         for i in range(d_e):
             E[i,:n+n_shift,:n+n_shift] = np.eye(n+n_shift)
-        for b in mol.GetBonds():
+        for b in self.mol.GetBonds(): # self.mol, very important!! no aromatic
             begin_idx = b.GetBeginAtomIdx()
             end_idx = b.GetEndAtomIdx()
             bond_type = b.GetBondType()
