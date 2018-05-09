@@ -221,7 +221,7 @@ class GCNPolicy(object):
             emb_node_null = tf.zeros(tf.shape(emb_node_stop))
             emb_node_stop = tf.where(condition=tf.tile(tf.expand_dims(logits_first_mask,axis=-1),(1,1,emb_node_stop.get_shape()[-1])), x=emb_node_stop, y=emb_node_null)
 
-        self.logits_stop = tf.reduce_sum(emb_node_stop,axis=1)
+        self.logits_stop = tf.reduce_max(emb_node_stop,axis=1)
         self.logits_stop = tf.layers.dense(self.logits_stop, 2, activation=None, name='linear_stop2_1')  # B*2
         # explicitly show node num
         # self.logits_stop = tf.concat((tf.reduce_mean(tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1'),axis=1),tf.reshape(ob_len_first/5,[-1,1])),axis=1)

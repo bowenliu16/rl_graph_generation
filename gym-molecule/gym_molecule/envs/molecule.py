@@ -183,7 +183,7 @@ class MoleculeEnv(gym.Env):
 
         ### calculate terminal rewards
         # todo: add terminal action
-        if (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop) and self.counter >= 30:
+        if self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop:
             # default reward
             reward_valid = 2
             reward_qed = 0
