@@ -89,7 +89,7 @@ class MoleculeEnv(gym.Env):
             possible_atoms = ['C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
                               'Br']  # ZINC
         self.possible_formal_charge = np.array([-1, 0, 1])
-        self.possible_implicit_valence = np.array([0, 1, 2, 3, 4])
+        self.possible_implicit_valence = np.array([-1,0, 1, 2, 3, 4])
         self.possible_ring_atom = np.array([True, False])
         self.possible_degree = np.array([0, 1, 2, 3, 4, 5, 6, 7])
         self.possible_hybridization = np.array([
@@ -104,6 +104,10 @@ class MoleculeEnv(gym.Env):
         self.atom_type_num = len(possible_atoms)
         self.possible_atom_types = np.array(possible_atoms)
         self.possible_bond_types = np.array(possible_bonds, dtype=object)
+        self.d_n = len(self.possible_atom_types) + len(
+            self.possible_formal_charge) + len(
+            self.possible_implicit_valence) + len(self.possible_ring_atom) + \
+              len(self.possible_degree) + len(self.possible_hybridization)
 
         if data_type=='gdb':
             self.max_atom = 13 + len(possible_atoms) # gdb 13
@@ -117,7 +121,7 @@ class MoleculeEnv(gym.Env):
         self.action_space = gym.spaces.MultiDiscrete([self.max_atom, self.max_atom, 3, 2])
         self.observation_space = {}
         self.observation_space['adj'] = gym.Space(shape=[len(possible_bonds), self.max_atom, self.max_atom])
-        self.observation_space['node'] = gym.Space(shape=[1, self.max_atom, len(possible_atoms)])
+        self.observation_space['node'] = gym.Space(shape=[1, self.max_atom, self.d_n])
 
         self.counter = 0
 
@@ -516,8 +520,9 @@ class MoleculeEnv(gym.Env):
         ob['node']:1*n*d_n --- 'F'
         n = atom_num + atom_type_num
         """
-
-        n = self.mol.GetNumAtoms()
+        mol = copy.deepcopy(self.mol)
+        Chem.SanitizeMol(mol)
+        n = mol.GetNumAtoms()
         n_shift = len(self.possible_atom_types) # assume isolated nodes new nodes exist
 
         d_n = len(self.possible_atom_types) + len(
@@ -525,7 +530,7 @@ class MoleculeEnv(gym.Env):
             self.possible_implicit_valence) + len(self.possible_ring_atom) + \
               len(self.possible_degree) + len(self.possible_hybridization)
         F = np.zeros((1, self.max_atom, d_n))
-        for a in self.mol.GetAtoms():
+        for a in mol.GetAtoms():
             atom_idx = a.GetIdx()
             atom_symbol = a.GetSymbol()
             formal_charge = a.GetFormalCharge()
@@ -533,6 +538,7 @@ class MoleculeEnv(gym.Env):
             ring_atom = a.IsInRing()
             degree = a.GetDegree()
             hybridization = a.GetHybridization()
+            # print(atom_symbol,formal_charge,implicit_valence,ring_atom,degree,hybridization)
             float_array = np.concatenate([(atom_symbol ==
                                            self.possible_atom_types),
                                           (formal_charge ==
@@ -544,7 +550,8 @@ class MoleculeEnv(gym.Env):
                                           (degree == self.possible_degree),
                                           (hybridization ==
                                            self.possible_hybridization)]).astype(float)
-            assert float_array.sum() == 6   # because there are 6 types of one
+            # assert float_array.sum() == 6   # because there are 6 types of one
+            # print(float_array,float_array.sum())
             # hot atom features
             F[0, atom_idx, :] = float_array
         # add the atom features for the auxiliary atoms. We only include the
@@ -558,7 +565,7 @@ class MoleculeEnv(gym.Env):
         E = np.zeros((d_e, self.max_atom, self.max_atom))
         for i in range(d_e):
             E[i,:n+n_shift,:n+n_shift] = np.eye(n+n_shift)
-        for b in self.mol.GetBonds():
+        for b in mol.GetBonds():
             begin_idx = b.GetBeginAtomIdx()
             end_idx = b.GetEndAtomIdx()
             bond_type = b.GetBondType()
@@ -715,7 +722,7 @@ class MoleculeEnv(gym.Env):
                                               (graph.node[node]['degree'] == self.possible_degree),
                                               (graph.node[node]['hybridization'] ==
                                                self.possible_hybridization)]).astype(float)
-                assert float_array.sum() == 6
+                # assert float_array.sum() == 6
                 ob['node'][i, 0, node_id, :] = float_array
                 # print('node',node_id,graph.node[node]['symbol'])
                 # atom = Chem.Atom(graph.node[node]['symbol'])
