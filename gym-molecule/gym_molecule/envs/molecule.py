@@ -528,19 +528,31 @@ class MoleculeEnv(gym.Env):
         n = mol.GetNumAtoms()
         n_shift = len(self.possible_atom_types) # assume isolated nodes new nodes exist
 
-        d_n = len(self.possible_atom_types) + len(
-            self.possible_formal_charge) + len(
-            self.possible_implicit_valence) + len(self.possible_ring_atom) + \
-              len(self.possible_degree) + len(self.possible_hybridization)
-        F = np.zeros((1, self.max_atom, d_n))
+
+        F = np.zeros((1, self.max_atom, self.d_n))
         for a in mol.GetAtoms():
             atom_idx = a.GetIdx()
             atom_symbol = a.GetSymbol()
-            formal_charge = a.GetFormalCharge()
-            implicit_valence = a.GetImplicitValence()
-            ring_atom = a.IsInRing()
-            degree = a.GetDegree()
-            hybridization = a.GetHybridization()
+            try:
+                formal_charge = a.GetFormalCharge()
+            except:
+                formal_charge = -10
+            try:
+                implicit_valence = a.GetImplicitValence()
+            except:
+                implicit_valence = -10
+            try:
+                ring_atom = a.IsInRing()
+            except:
+                ring_atom = -10
+            try:
+                degree = a.GetDegree()
+            except:
+                degree = -10
+            try:
+                hybridization = a.GetHybridization()
+            except:
+                hybridization = -10
             # print(atom_symbol,formal_charge,implicit_valence,ring_atom,degree,hybridization)
             float_array = np.concatenate([(atom_symbol ==
                                            self.possible_atom_types),
@@ -559,7 +571,7 @@ class MoleculeEnv(gym.Env):
             F[0, atom_idx, :] = float_array
         # add the atom features for the auxiliary atoms. We only include the
         # atom symbol features
-        auxiliary_atom_features = np.zeros((n_shift, d_n)) # for padding
+        auxiliary_atom_features = np.zeros((n_shift, self.d_n)) # for padding
         temp = np.eye(n_shift)
         auxiliary_atom_features[:temp.shape[0], :temp.shape[1]] = temp
         F[0,n:n+n_shift,:] = auxiliary_atom_features
@@ -639,11 +651,7 @@ class MoleculeEnv(gym.Env):
         ob = {}
         atom_type_num = len(self.possible_atom_types)
         bond_type_num = len(self.possible_bond_types)
-        d_n = len(self.possible_atom_types) + len(
-            self.possible_formal_charge) + len(
-            self.possible_implicit_valence) + len(self.possible_ring_atom) + \
-              len(self.possible_degree) + len(self.possible_hybridization)
-        ob['node'] = np.zeros((batch_size, 1, self.max_atom, d_n))
+        ob['node'] = np.zeros((batch_size, 1, self.max_atom, self.d_n))
         ob['adj'] = np.zeros((batch_size, bond_type_num, self.max_atom, self.max_atom))
 
         ac = np.zeros((batch_size, 4))
@@ -730,7 +738,7 @@ class MoleculeEnv(gym.Env):
                 # print('node',node_id,graph.node[node]['symbol'])
                 # atom = Chem.Atom(graph.node[node]['symbol'])
                 # rw_mol.AddAtom(atom)
-            auxiliary_atom_features = np.zeros((atom_type_num, d_n))  # for padding
+            auxiliary_atom_features = np.zeros((atom_type_num, self.d_n))  # for padding
             temp = np.eye(atom_type_num)
             auxiliary_atom_features[:temp.shape[0], :temp.shape[1]] = temp
             ob['node'][i ,0, n:n + atom_type_num, :] = auxiliary_atom_features
