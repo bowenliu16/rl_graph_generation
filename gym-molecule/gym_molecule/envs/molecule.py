@@ -521,7 +521,10 @@ class MoleculeEnv(gym.Env):
         n = atom_num + atom_type_num
         """
         mol = copy.deepcopy(self.mol)
-        Chem.SanitizeMol(mol)
+        try:
+            Chem.SanitizeMol(mol)
+        except:
+            pass
         n = mol.GetNumAtoms()
         n_shift = len(self.possible_atom_types) # assume isolated nodes new nodes exist
 
