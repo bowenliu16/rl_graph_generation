@@ -129,7 +129,7 @@ def discriminator_net(ob,args,name='d_net'):
         # emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
         emb_node = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear1')
 
-        ob_len = tf.reduce_sum(tf.squeeze(tf.reduce_sum(ob['node'], axis=-1), axis=-2), axis=-1)-ob['node'].get_shape()[-1]  # B
+        ob_len = tf.reduce_sum(tf.squeeze(tf.reduce_sum(ob['node'], axis=-1), axis=-2), axis=-1)-9  # todo: add args!!
         logits_mask = tf.sequence_mask(ob_len, maxlen=tf.shape(ob['node'])[2])  # mask all valid entry
 
         if args.mask_null == 1:
@@ -155,7 +155,6 @@ def discriminator(x,x_gen,args,name='d_net'):
     d = tf.reduce_mean(d)
     d_ = tf.reduce_mean(d_)
     d_loss = d - d_
-    # todo: try adding d_grad_loss
 
     return d_loss, d, d_
 
