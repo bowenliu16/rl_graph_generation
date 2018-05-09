@@ -128,10 +128,17 @@ def discriminator_net(ob,args,name='d_net'):
         emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, is_act=False, is_normalize=True, name='gcn3',aggregate=args.gcn_aggregate)
         # emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
         emb_node = tf.squeeze(emb_node, axis=1)
-        emb_node = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear1')
 
-        ob_len = tf.reduce_sum(tf.squeeze(tf.reduce_sum(ob['node'], axis=-1), axis=-2), axis=-1)-9  # todo: add args!!
+        ob_len = tf.reduce_sum(tf.squeeze(tf.reduce_sum(ob['node'], axis=-1), axis=-2), axis=-1) - 9  # todo: add args!!
         logits_mask = tf.sequence_mask(ob_len, maxlen=tf.shape(ob['node'])[2])  # mask all valid entry
+
+        if args.mask_null == 1:
+            emb_node_null = tf.zeros(tf.shape(emb_node))
+            emb_node = tf.where(
+                condition=tf.tile(tf.expand_dims(logits_mask, axis=-1), (1, 1, emb_node.get_shape()[-1])), x=emb_node,
+                y=emb_node_null)
+
+        emb_node = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear1',use_bias=False)
 
         if args.mask_null == 1:
             emb_node_null = tf.zeros(tf.shape(emb_node))
@@ -209,7 +216,7 @@ class GCNPolicy(object):
             emb_node = tf.where(condition=tf.tile(tf.expand_dims(logits_mask,axis=-1),(1,1,emb_node.get_shape()[-1])), x=emb_node, y=emb_node_null)
 
         ### 2 predict stop
-        emb_node_stop = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_stop1')
+        emb_node_stop = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_stop1',use_bias=False)
         if args.mask_null==1:
             emb_node_null = tf.zeros(tf.shape(emb_node_stop))
             emb_node_stop = tf.where(condition=tf.tile(tf.expand_dims(logits_first_mask,axis=-1),(1,1,emb_node_stop.get_shape()[-1])), x=emb_node_stop, y=emb_node_null)
@@ -309,7 +316,7 @@ class GCNPolicy(object):
 
         # ncat_list = [tf.shape(logits_first),ob_space['adj'].shape[-1],ob_space['adj'].shape[0]]
         self.pd = self.pdtype(-1).pdfromflat([self.logits_first,self.logits_second_real,self.logits_edge_real,self.logits_stop])
-        self.vpred = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='value1')
+        self.vpred = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='value1',use_bias=False)
         if args.mask_null==1:
             self.vpred_null = tf.zeros(tf.shape(self.vpred))
             self.vpred = tf.where(condition=tf.tile(tf.expand_dims(logits_first_mask,axis=-1),(1,1,self.vpred.get_shape()[-1])), x=self.vpred, y=self.vpred_null)
