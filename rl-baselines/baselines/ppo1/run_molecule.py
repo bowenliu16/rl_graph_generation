@@ -79,7 +79,7 @@ def molecule_arg_parser():
     parser.add_argument('--logp_ratio', type=float, default=1)
     parser.add_argument('--qed_ratio', type=float, default=1)
     parser.add_argument('--sa_ratio', type=float, default=1)
-    parser.add_argument('--gan_step_ratio', type=float, default=1)
+    parser.add_argument('--gan_step_ratio', type=float, default=2)
     parser.add_argument('--gan_final_ratio', type=float, default=2)
     parser.add_argument('--reward_step_total', type=float, default=0.5)
     parser.add_argument('--lr', type=float, default=3e-4)
