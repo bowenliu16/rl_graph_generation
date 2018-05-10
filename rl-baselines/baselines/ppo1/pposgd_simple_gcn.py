@@ -435,30 +435,30 @@ def learn(args,env, policy_fn, *,
     #     print('var_list_d', var)
     ## debug
     debug={}
-    debug['ac'] = ac
-    debug['ob_adj'] = ob['adj']
-    debug['ob_node'] = ob['node']
-    debug['pi_logp'] = pi_logp
-    debug['oldpi_logp'] = oldpi_logp
-    debug['kloldnew'] = kloldnew
-    debug['ent'] = ent
-    debug['ratio'] = ratio
-    debug['ratio_log'] = ratio_log
-    debug['emb_node2'] = pi.emb_node2
-    debug['pi_logitfirst'] = pi.logits_first
-    debug['pi_logitsecond'] = pi.logits_second
-    debug['pi_logitedge'] = pi.logits_edge
-
-    debug['pi_ac'] = pi.ac
-    debug['oldpi_logitfirst'] = oldpi.logits_first
-    debug['oldpi_logitsecond'] = oldpi.logits_second
-    debug['oldpi_logitedge'] = oldpi.logits_edge
-
-    debug['oldpi_ac'] = oldpi.ac
-
-    with tf.variable_scope('pi/gcn1', reuse=tf.AUTO_REUSE):
-        w = tf.get_variable('W')
-        debug['w'] = w
+    # debug['ac'] = ac
+    # debug['ob_adj'] = ob['adj']
+    # debug['ob_node'] = ob['node']
+    # debug['pi_logp'] = pi_logp
+    # debug['oldpi_logp'] = oldpi_logp
+    # debug['kloldnew'] = kloldnew
+    # debug['ent'] = ent
+    # debug['ratio'] = ratio
+    # debug['ratio_log'] = ratio_log
+    # debug['emb_node2'] = pi.emb_node2
+    # debug['pi_logitfirst'] = pi.logits_first
+    # debug['pi_logitsecond'] = pi.logits_second
+    # debug['pi_logitedge'] = pi.logits_edge
+    #
+    # debug['pi_ac'] = pi.ac
+    # debug['oldpi_logitfirst'] = oldpi.logits_first
+    # debug['oldpi_logitsecond'] = oldpi.logits_second
+    # debug['oldpi_logitedge'] = oldpi.logits_edge
+    #
+    # debug['oldpi_ac'] = oldpi.ac
+    #
+    # with tf.variable_scope('pi/gcn1', reuse=tf.AUTO_REUSE):
+    #     w = tf.get_variable('W')
+    #     debug['w'] = w
 
 
     ## loss update function
