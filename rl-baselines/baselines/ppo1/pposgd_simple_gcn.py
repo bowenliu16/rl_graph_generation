@@ -607,7 +607,8 @@ def learn(args,env, policy_fn, *,
                 losses_d_step = []
                 for batch in d.iterate_once(optim_batchsize):
                     # ppo
-                    if args.has_ppo==1:
+                    # if args.has_ppo==1:
+                    if iters_so_far >= args.rl_start+5:
                         *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                         adam_pi.update(g_ppo, optim_stepsize * cur_lrmult)
                         losses_ppo.append(newlosses)
