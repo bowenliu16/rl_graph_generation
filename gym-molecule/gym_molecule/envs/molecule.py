@@ -74,11 +74,12 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         pass
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False):
         '''
         own init function, since gym does not support passing argument
         '''
         self.is_normalize = bool(is_normalize)
+        self.has_feature = has_feature
         self.reward_type = reward_type
         self.reward_target = reward_target
         self.mol = Chem.RWMol()
@@ -88,26 +89,31 @@ class MoleculeEnv(gym.Env):
         elif data_type=='zinc':
             possible_atoms = ['C', 'N', 'O', 'S', 'P', 'F', 'I', 'Cl',
                               'Br']  # ZINC
-        self.possible_formal_charge = np.array([-1, 0, 1])
-        self.possible_implicit_valence = np.array([-1,0, 1, 2, 3, 4])
-        self.possible_ring_atom = np.array([True, False])
-        self.possible_degree = np.array([0, 1, 2, 3, 4, 5, 6, 7])
-        self.possible_hybridization = np.array([
-            Chem.rdchem.HybridizationType.SP,
-                                  Chem.rdchem.HybridizationType.SP2,
-                                  Chem.rdchem.HybridizationType.SP3,
-                                  Chem.rdchem.HybridizationType.SP3D,
-                                  Chem.rdchem.HybridizationType.SP3D2],
-            dtype=object)
+        if self.has_feature:
+            self.possible_formal_charge = np.array([-1, 0, 1])
+            self.possible_implicit_valence = np.array([-1,0, 1, 2, 3, 4])
+            self.possible_ring_atom = np.array([True, False])
+            self.possible_degree = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+            self.possible_hybridization = np.array([
+                Chem.rdchem.HybridizationType.SP,
+                                      Chem.rdchem.HybridizationType.SP2,
+                                      Chem.rdchem.HybridizationType.SP3,
+                                      Chem.rdchem.HybridizationType.SP3D,
+                                      Chem.rdchem.HybridizationType.SP3D2],
+                dtype=object)
         possible_bonds = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                           Chem.rdchem.BondType.TRIPLE] #, Chem.rdchem.BondType.AROMATIC
         self.atom_type_num = len(possible_atoms)
         self.possible_atom_types = np.array(possible_atoms)
         self.possible_bond_types = np.array(possible_bonds, dtype=object)
-        self.d_n = len(self.possible_atom_types) + len(
-            self.possible_formal_charge) + len(
-            self.possible_implicit_valence) + len(self.possible_ring_atom) + \
-              len(self.possible_degree) + len(self.possible_hybridization)
+
+        if self.has_feature:
+            self.d_n = len(self.possible_atom_types) + len(
+                self.possible_formal_charge) + len(
+                self.possible_implicit_valence) + len(self.possible_ring_atom) + \
+                  len(self.possible_degree) + len(self.possible_hybridization)
+        else:
+            self.d_n = len(self.possible_atom_types)
 
         if data_type=='gdb':
             self.max_atom = 13 + len(possible_atoms) # gdb 13
@@ -238,15 +244,15 @@ class MoleculeEnv(gym.Env):
                     if self.reward_type == 'logppen':
                         reward_final += reward_penalized_log_p(final_mol)/3
                     elif self.reward_type == 'logp_target':
-                        reward_final += reward_target_logp(final_mol,target=self.reward_target)
+                        reward_final += reward_target(final_mol,target=self.reward_target,ratio=0.5,val_max=2,val_min=-2,func=MolLogP)
                     elif self.reward_type == 'qed':
-                        reward_final += reward_qed
+                        reward_final += reward_qed*2
                     elif self.reward_type == 'qedsa':
-                        reward_final += (reward_qed + reward_sa)*2
+                        reward_final += (reward_qed*1.5 + reward_sa*0.5)
                     elif self.reward_type == 'qed_target':
-                        reward_final += reward_target_qed(final_mol, target=self.reward_target)
+                        reward_final += reward_target(final_mol,target=self.reward_target,ratio=0.1,val_max=2,val_min=-2,func=qed)
                     elif self.reward_type == 'mw_target':
-                        reward_final += reward_target_mw(final_mol, target=self.reward_target)
+                        reward_final += reward_target(final_mol,target=self.reward_target,ratio=40,val_max=2,val_min=-2,func=rdMolDescriptors.CalcExactMolWt)
                     elif self.reward_type == 'gan':
                         reward_final = 0
                     else:
@@ -534,38 +540,27 @@ class MoleculeEnv(gym.Env):
         for a in mol.GetAtoms():
             atom_idx = a.GetIdx()
             atom_symbol = a.GetSymbol()
-            try:
+            if self.has_feature:
                 formal_charge = a.GetFormalCharge()
-            except:
-                formal_charge = -10
-            try:
                 implicit_valence = a.GetImplicitValence()
-            except:
-                implicit_valence = -10
-            try:
                 ring_atom = a.IsInRing()
-            except:
-                ring_atom = -10
-            try:
                 degree = a.GetDegree()
-            except:
-                degree = -10
-            try:
                 hybridization = a.GetHybridization()
-            except:
-                hybridization = -10
             # print(atom_symbol,formal_charge,implicit_valence,ring_atom,degree,hybridization)
-            float_array = np.concatenate([(atom_symbol ==
-                                           self.possible_atom_types),
-                                          (formal_charge ==
-                                           self.possible_formal_charge),
-                                          (implicit_valence ==
-                                           self.possible_implicit_valence),
-                                          (ring_atom ==
-                                           self.possible_ring_atom),
-                                          (degree == self.possible_degree),
-                                          (hybridization ==
-                                           self.possible_hybridization)]).astype(float)
+            if self.has_feature:
+                float_array = np.concatenate([(atom_symbol ==
+                                               self.possible_atom_types),
+                                              (formal_charge ==
+                                               self.possible_formal_charge),
+                                              (implicit_valence ==
+                                               self.possible_implicit_valence),
+                                              (ring_atom ==
+                                               self.possible_ring_atom),
+                                              (degree == self.possible_degree),
+                                              (hybridization ==
+                                               self.possible_hybridization)]).astype(float)
+            else:
+                float_array = (atom_symbol == self.possible_atom_types).astype(float)
             # assert float_array.sum() == 6   # because there are 6 types of one
             # print(float_array,float_array.sum())
             # hot atom features
@@ -722,18 +717,21 @@ class MoleculeEnv(gym.Env):
             # rw_mol = Chem.RWMol()
             n = graph_sub.number_of_nodes()
             for node_id, node in enumerate(graph_sub.nodes()):
-                # float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
-                float_array = np.concatenate([(graph.node[node]['symbol'] ==
-                                               self.possible_atom_types),
-                                              (graph.node[node]['formal_charge'] ==
-                                               self.possible_formal_charge),
-                                              (graph.node[node]['implicit_valence'] ==
-                                               self.possible_implicit_valence),
-                                              (graph.node[node]['ring_atom'] ==
-                                               self.possible_ring_atom),
-                                              (graph.node[node]['degree'] == self.possible_degree),
-                                              (graph.node[node]['hybridization'] ==
-                                               self.possible_hybridization)]).astype(float)
+                if self.has_feature:
+                    float_array = np.concatenate([(graph.node[node]['symbol'] ==
+                                                   self.possible_atom_types),
+                                                  (graph.node[node]['formal_charge'] ==
+                                                   self.possible_formal_charge),
+                                                  (graph.node[node]['implicit_valence'] ==
+                                                   self.possible_implicit_valence),
+                                                  (graph.node[node]['ring_atom'] ==
+                                                   self.possible_ring_atom),
+                                                  (graph.node[node]['degree'] == self.possible_degree),
+                                                  (graph.node[node]['hybridization'] ==
+                                                   self.possible_hybridization)]).astype(float)
+                else:
+                    float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
+
                 # assert float_array.sum() == 6
                 ob['node'][i, 0, node_id, :] = float_array
                 # print('node',node_id,graph.node[node]['symbol'])
@@ -1368,6 +1366,11 @@ def steric_strain_filter(mol, cutoff=0.82,
 
 ### TARGET VALUE REWARDS ###
 
+def reward_target(mol, target, ratio, val_max, val_min, func):
+    x = func(mol)
+    reward = max(-1*np.abs((x-target)/ratio) + val_max,val_min)
+    return reward
+
 def reward_target_logp(mol, target,ratio=0.5,max=4):
     """
     Reward for a target log p
@@ -1632,7 +1635,7 @@ if __name__ == '__main__':
     # print(max(atom_list),max(bond_list))
 
 
-    # print(reward_penalized_log_p(Chem.MolFromSmiles('C=[IH2][IH2](I)[IH2](I)I(I)(II)(C(I)I)P(I)([IH2]=I)(P(I)P(I)I)P(I)(I)(I)(I)([IH2]=I)P(I)(I)(PI)II')))
+    print(reward_penalized_log_p(Chem.MolFromSmiles('BrIP(I)(IP(I)I)(IP(I)(I)(I)P(I)IP(I)(I)(III)I(I)(I)(I)I(Br)(I)(I)IC(Br)(I)I)P(I)I')))
     # env.get_expert(4)
 
     # env.step(np.array([[0,3,0]]))

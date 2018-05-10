@@ -47,7 +47,7 @@ def train(args,seed,writer=None):
         timesteps_per_actorbatch=256,
         clip_param=0.2, entcoeff=0.01,
         optim_epochs=4, optim_stepsize=args.lr, optim_batchsize=32,
-        gamma=0.99, lam=0.95,
+        gamma=1, lam=0.95,
         schedule='linear', writer=writer
     )
     env.close()
@@ -82,7 +82,7 @@ def molecule_arg_parser():
     parser.add_argument('--gan_step_ratio', type=float, default=1)
     parser.add_argument('--gan_final_ratio', type=float, default=2)
     parser.add_argument('--reward_step_total', type=float, default=0.5)
-    parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--lr', type=float, default=3e-4)
     # parser.add_argument('--has_rl', type=int, default=1)
     # parser.add_argument('--has_expert', type=int, default=1)
     parser.add_argument('--has_d_step', type=int, default=1)
