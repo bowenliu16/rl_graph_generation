@@ -110,6 +110,7 @@ def molecule_arg_parser():
     parser.add_argument('--gcn_aggregate', type=str, default='mean')# sum, mean, concat
     parser.add_argument('--gate_sum_d', type=int, default=0)
     parser.add_argument('--mask_null', type=int, default=0)
+    parser.add_argument('--bn', type=int, default=1)
     parser.add_argument('--name_full',type=str,default='')
     parser.add_argument('--name_full_load',type=str,default='')
 

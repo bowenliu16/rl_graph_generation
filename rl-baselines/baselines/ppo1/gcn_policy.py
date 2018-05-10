@@ -123,17 +123,28 @@ def emb_node(ob_node,out_channels):
 def discriminator_net(ob,args,name='d_net'):
     with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
         ob_node = tf.layers.dense(ob['node'], 8, activation=None, use_bias=False, name='emb')  # embedding layer
-        emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
-        emb_node1 = GCN_batch(ob['adj'], emb_node1, args.emb_size, name='gcn2',aggregate=args.gcn_aggregate)
-        emb_node2 = GCN_batch(ob['adj'], emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn3',aggregate=args.gcn_aggregate)
+        if args.bn==1:
+            ob_node = tf.layers.batch_normalization(ob_node,axis=-1)
+        emb_node = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
+        if args.bn==1:
+            emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
+        emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, name='gcn2',aggregate=args.gcn_aggregate)
+        if args.bn==1:
+            emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
+        emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, is_act=False, is_normalize=(args.bn == 0), name='gcn3',aggregate=args.gcn_aggregate)
+        if args.bn==1:
+            emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
         # emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
-        emb_node2 = tf.layers.dense(emb_node2, args.emb_size, activation=tf.nn.relu, name='linear1')
+        emb_node = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear1')
+        if args.bn==1:
+            emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
+
 
         if args.gate_sum_d==1:
-            emb_node_gate = tf.layers.dense(emb_node2,1,activation=tf.nn.sigmoid,name='gate')
-            emb_graph = tf.reduce_sum(tf.squeeze(emb_node2*emb_node_gate, axis=1),axis=1)  # B*f
+            emb_node_gate = tf.layers.dense(emb_node,1,activation=tf.nn.sigmoid,name='gate')
+            emb_graph = tf.reduce_sum(tf.squeeze(emb_node*emb_node_gate, axis=1),axis=1)  # B*f
         else:
-            emb_graph = tf.reduce_sum(tf.squeeze(emb_node2, axis=1), axis=1)  # B*f
+            emb_graph = tf.reduce_sum(tf.squeeze(emb_node, axis=1), axis=1)  # B*f
         logit = tf.layers.dense(emb_graph, 1, activation=None, name='linear2')
         pred = tf.sigmoid(logit)
         # pred = tf.layers.dense(emb_graph, 1, activation=None, name='linear1')
@@ -166,19 +177,25 @@ class GCNPolicy(object):
         # only when evaluating given action, at training time
         self.ac_real = U.get_placeholder(name='ac_real', dtype=tf.int64, shape=[None,4]) # feed groudtruth action
         ob_node = tf.layers.dense(ob['node'],8,activation=None,use_bias=False,name='emb') # embedding layer
+        if args.bn==1:
+            ob_node = tf.layers.batch_normalization(ob_node,axis=-1)
         if args.has_concat==1:
-            self.emb_node1 = tf.concat((GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate),ob_node),axis=-1)
+            emb_node = tf.concat((GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate),ob_node),axis=-1)
         else:
-            self.emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
+            emb_node = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
+        if args.bn == 1:
+            emb_node = tf.layers.batch_normalization(emb_node, axis=-1)
         for i in range(args.layer_num-2):
             if args.has_residual==1:
-                self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate)+self.emb_node1
+                emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate)+self.emb_node1
             elif args.has_concat==1:
-                self.emb_node1 = tf.concat((GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate),self.emb_node1),axis=-1)
+                emb_node = tf.concat((GCN_batch(ob['adj'], emb_node, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate),self.emb_node1),axis=-1)
             else:
-                self.emb_node1 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, name='gcn1_' + str(i + 1),aggregate=args.gcn_aggregate)
-        self.emb_node2 = GCN_batch(ob['adj'], self.emb_node1, args.emb_size, is_act=False, is_normalize=True, name='gcn2',aggregate=args.gcn_aggregate)
-        emb_node = tf.squeeze(self.emb_node2,axis=1)  # B*n*f
+                emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, name='gcn1_' + str(i + 1),aggregate=args.gcn_aggregate)
+            if args.bn == 1:
+                emb_node = tf.layers.batch_normalization(emb_node, axis=-1)
+        emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, is_act=False, is_normalize=(args.bn == 0), name='gcn2',aggregate=args.gcn_aggregate)
+        emb_node = tf.squeeze(emb_node,axis=1)  # B*n*f
 
         ### 1 only keep effective nodes
         # ob_mask = tf.cast(tf.transpose(tf.reduce_sum(ob['node'],axis=-1),[0,2,1]),dtype=tf.bool) # B*n*1
@@ -198,7 +215,10 @@ class GCNPolicy(object):
             emb_node = tf.concat([emb_node, emb_graph], axis=2)
 
         ### 2 predict stop
-        self.logits_stop = tf.reduce_sum(tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_stop1'),axis=1)
+        emb_stop = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_stop1')
+        if args.bn==1:
+            emb_stop = tf.layers.batch_normalization(emb_stop,axis=-1)
+        self.logits_stop = tf.reduce_sum(emb_stop,axis=1)
         self.logits_stop = tf.layers.dense(self.logits_stop, 2, activation=None, name='linear_stop2_1')  # B*2
         # explicitly show node num
         # self.logits_stop = tf.concat((tf.reduce_mean(tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1'),axis=1),tf.reshape(ob_len_first/5,[-1,1])),axis=1)
@@ -294,8 +314,10 @@ class GCNPolicy(object):
         # ncat_list = [tf.shape(logits_first),ob_space['adj'].shape[-1],ob_space['adj'].shape[0]]
         self.pd = self.pdtype(-1).pdfromflat([self.logits_first,self.logits_second_real,self.logits_edge_real,self.logits_stop])
         self.vpred = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='value1')
+        if args.bn==1:
+            self.vpred = tf.layers.batch_normalization(self.vpred,axis=-1)
         self.vpred = tf.layers.dense(self.vpred, 1, activation=None, name='value2')
-        self.vpred = tf.reduce_max(self.vpred,axis=1)
+        self.vpred = tf.reduce_mean(self.vpred,axis=1)
 
         self.state_in = []
         self.state_out = []
@@ -315,8 +337,6 @@ class GCNPolicy(object):
         debug['ob_node'] = tf.shape(ob['node'])
         debug['ob_adj'] = tf.shape(ob['adj'])
         debug['emb_node'] = emb_node
-        debug['emb_node1'] = self.emb_node1
-        debug['emb_node2'] = self.emb_node2
         debug['logits_stop'] = self.logits_stop
         debug['logits_second'] = self.logits_second
         debug['ob_len'] = ob_len
