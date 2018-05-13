@@ -108,6 +108,7 @@ def molecule_arg_parser():
     parser.add_argument('--has_concat', type=int, default=0)
     parser.add_argument('--emb_size', type=int, default=64)
     parser.add_argument('--gcn_aggregate', type=str, default='mean')# sum, mean, concat
+    parser.add_argument('--gan_type', type=str, default='normal')# normal, recommend, wgan
     parser.add_argument('--gate_sum_d', type=int, default=0)
     parser.add_argument('--mask_null', type=int, default=0)
     parser.add_argument('--bn', type=int, default=1)
