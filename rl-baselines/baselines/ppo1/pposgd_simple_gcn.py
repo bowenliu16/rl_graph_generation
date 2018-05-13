@@ -564,7 +564,7 @@ def learn(args,env, policy_fn, *,
 
 
         # inner training loop, train policy
-        for _ in range(optim_epochs):
+        for i_optim in range(optim_epochs):
 
             loss_expert=0
             loss_expert_stop=0
@@ -599,14 +599,14 @@ def learn(args,env, policy_fn, *,
                     *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                     losses_ppo=newlosses
 
-                if args.has_d_step==1 and np.random.rand()<0.5:
+                if args.has_d_step==1 and i_optim<=optim_epochs//2:
                     # update step discriminator
                     ob_expert, _ = env.get_expert(optim_batchsize,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
                     loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
                     adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
                     loss_d_step = np.mean(loss_d_step)
 
-                if args.has_d_final==1 and np.random.rand()<0.25:
+                if args.has_d_final==1 and i_optim<=optim_epochs//4:
                     # update final discriminator
                     ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,level_total=args.curriculum_num, level=level)
                     seg_final_adj, seg_final_node = traj_final_generator(pi, copy.deepcopy(env), optim_batchsize,True)
@@ -619,8 +619,8 @@ def learn(args,env, policy_fn, *,
 
             # update generator
             adam_pi_stop.update(0.5*g_expert_stop, optim_stepsize * cur_lrmult)
-            adam_pi.update(0.5*g_expert, optim_stepsize * cur_lrmult)
-            # adam_pi.update(0.5*g_expert, optim_stepsize * cur_lrmult)
+            adam_pi.update(g_ppo+0.5*g_expert, optim_stepsize * cur_lrmult)
+            adam_pi.update(g_ppo+0.5*g_expert, optim_stepsize * cur_lrmult)
 
         # WGAN
         # if args.has_d_step == 1:
