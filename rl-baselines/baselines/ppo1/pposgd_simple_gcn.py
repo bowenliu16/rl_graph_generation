@@ -549,92 +549,88 @@ def learn(args,env, policy_fn, *,
         # logger.log("********** Iteration %i ************"%iters_so_far)
 
 
+        ## when PPO start, prepare PPO training data
+        # if iters_so_far >= args.rl_start and iters_so_far <= args.rl_end:
 
-        ## Expert
-        loss_expert=0
-        loss_expert_stop=0
-        g_expert=0
-        # if args.has_expert==1:
-        if iters_so_far>=args.expert_start and iters_so_far<=args.expert_end:
-            ## Expert train
-            losses = []  # list of tuples, each of which gives the loss for a minibatch
-            losses_stop = []  # list of tuples, each of which gives the loss for a minibatch
-            for _ in range(optim_epochs*args.supervise_time):
-                # learn how to stop
-                ob_expert, ac_expert = env.get_expert(optim_batchsize, is_final=True)
-                losses_expert_stop, g_expert = lossandgrad_expert_stop(ob_expert['adj'], ob_expert['node'], ac_expert,ac_expert)
-                adam_pi_stop.update(g_expert, optim_stepsize * cur_lrmult/10)
-                losses_stop.append(losses_expert_stop)
-                ob_expert, ac_expert = env.get_expert(optim_batchsize)
-                losses_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
-                adam_pi.update(g_expert, optim_stepsize * cur_lrmult/10)
-                losses.append(losses_expert)
-
-            loss_expert = np.mean(losses, axis=0, keepdims=True)
-            loss_expert_stop = np.mean(losses_stop, axis=0, keepdims=True)
-            # logger.log(fmt_row(13, loss_expert))
-
-        ## PPO
         seg = seg_gen.__next__()
         add_vtarg_and_adv(seg, gamma, lam)
-
         # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
         ob_adj, ob_node, ac, atarg, tdlamret = seg["ob_adj"], seg["ob_node"], seg["ac"], seg["adv"], seg["tdlamret"]
-        vpredbefore = seg["vpred"] # predicted value function before udpate
-        atarg = (atarg - atarg.mean()) / atarg.std() # standardized advantage function estimate
-        d = Dataset(dict(ob_adj=ob_adj, ob_node=ob_node, ac=ac, atarg=atarg, vtarg=tdlamret), shuffle=not pi.recurrent)
+        vpredbefore = seg["vpred"]  # predicted value function before udpate
+        atarg = (atarg - atarg.mean()) / atarg.std()  # standardized advantage function estimate
+        d = Dataset(dict(ob_adj=ob_adj, ob_node=ob_node, ac=ac, atarg=atarg, vtarg=tdlamret),
+                    shuffle=not pi.recurrent)
         optim_batchsize = optim_batchsize or ob_adj.shape[0]
 
 
-        loss_d_step=0
-        loss_d_final=0
-        g_ppo=0
-        g_d_step=0
-        g_d_final=0
-        # if args.has_rl==1:
-        if iters_so_far>=args.rl_start and iters_so_far<=args.rl_end:
-            ## PPO train
-            assign_old_eq_new() # set old parameter values to new parameter values
-            # logger.log("Optimizing...")
-            # logger.log(fmt_row(13, loss_names))
-            # Here we do a bunch of optimization epochs over the data
-            if args.has_d_final == 1:
-                ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,
-                                              level_total=args.curriculum_num, level=level)
-                seg_final_adj, seg_final_node = traj_final_generator(pi, copy.deepcopy(env), optim_batchsize, True)
-            for _ in range(optim_epochs):
-                losses_ppo = [] # list of tuples, each of which gives the loss for a minibatch
-                losses_d_step = []
-                for batch in d.iterate_once(optim_batchsize):
-                    # ppo
-                    # if args.has_ppo==1:
-                    if iters_so_far >= args.rl_start+5:
-                        *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
-                        adam_pi.update(g_ppo, optim_stepsize * cur_lrmult)
-                        losses_ppo.append(newlosses)
-                    if args.has_d_step==1:
-                        # update step discriminator
-                        ob_expert, _ = env.get_expert(optim_batchsize,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
-                        loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
-                        # print('loss_d_step',loss_d_step,g_d_step)
-                        adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
-                        losses_d_step.append(loss_d_step)
-                loss_d_step = np.mean(losses_d_step, axis=0, keepdims=True)
-                if args.has_d_final==1:
+        # inner training loop, train policy
+        for _ in range(optim_epochs):
+
+            loss_expert=0
+            loss_expert_stop=0
+            g_expert=0
+
+            loss_d_step = 0
+            loss_d_final = 0
+            g_ppo = 0
+            g_d_step = 0
+            g_d_final = 0
+
+            ## Expert
+            if iters_so_far>=args.expert_start and iters_so_far<=args.expert_end:
+                ## Expert train
+                # # learn how to stop
+                # ob_expert, ac_expert = env.get_expert(optim_batchsize, is_final=True)
+                # losses_expert_stop, g_expert = lossandgrad_expert_stop(ob_expert['adj'], ob_expert['node'], ac_expert,ac_expert)
+                # adam_pi_stop.update(g_expert, optim_stepsize * cur_lrmult/10)
+                # losses_stop.append(losses_expert_stop)
+
+                ob_expert, ac_expert = env.get_expert(optim_batchsize)
+                loss_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
+                loss_expert = np.mean(loss_expert)
+
+
+            ## PPO
+            if iters_so_far>=args.rl_start and iters_so_far<=args.rl_end:
+                assign_old_eq_new() # set old parameter values to new parameter values
+                batch = d.next_batch(optim_batchsize)
+                # ppo
+                # if args.has_ppo==1:
+                if iters_so_far >= args.rl_start+5: # start generator after discriminator trained a well..
+                    *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
+                    losses_ppo=newlosses
+
+                if args.has_d_step==1 and np.random.rand()<0.5:
+                    # update step discriminator
+                    ob_expert, _ = env.get_expert(optim_batchsize,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
+                    loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
+                    adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
+                    loss_d_step = np.mean(loss_d_step)
+
+                if args.has_d_final==1 and np.random.rand()<0.25:
+                    # update final discriminator
+                    ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,level_total=args.curriculum_num, level=level)
+                    seg_final_adj, seg_final_node = traj_final_generator(pi, copy.deepcopy(env), optim_batchsize,True)
                     # update final discriminator
                     loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], seg_final_adj, seg_final_node)
                     # loss_d_final, g_d_final = lossandgrad_d_final(ob_expert["adj"], ob_expert["node"], ob_adjs, ob_nodes)
                     adam_d_final.update(g_d_final, optim_stepsize * cur_lrmult)
                     # print(seg["ob_adj_final"].shape)
                     # logger.log(fmt_row(13, np.mean(losses, axis=0)))
-        #
+
+            # update generator
+            adam_pi.update(g_ppo+0.5*g_expert, optim_stepsize * cur_lrmult)
+
+        # WGAN
         # if args.has_d_step == 1:
         #     clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_d_step]
         # if args.has_d_final == 1:
         #     clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_d_final]
         #
 
+
         ## PPO val
+        # if iters_so_far >= args.rl_start and iters_so_far <= args.rl_end:
         # logger.log("Evaluating losses...")
         losses = []
         for batch in d.iterate_once(optim_batchsize):

@@ -670,6 +670,10 @@ class MoleculeEnv(gym.Env):
             Chem.SanitizeMol(mol,sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
             graph = mol_to_nx(mol)
             edges = graph.edges()
+            # always involve is_final probability
+            if is_final==False and np.random.rand()<1/batch_size:
+                is_final = True
+
             # select the edge num for the subgraph
             if is_final:
                 edges_sub_len = len(edges)
