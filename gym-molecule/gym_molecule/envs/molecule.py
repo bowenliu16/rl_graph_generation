@@ -671,7 +671,7 @@ class MoleculeEnv(gym.Env):
             graph = mol_to_nx(mol)
             edges = graph.edges()
             # always involve is_final probability
-            if is_final==False and np.random.rand()<1/batch_size:
+            if is_final==False and np.random.rand()<1.0/batch_size:
                 is_final = True
 
             # select the edge num for the subgraph
