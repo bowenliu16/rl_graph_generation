@@ -580,10 +580,9 @@ def learn(args,env, policy_fn, *,
             if iters_so_far>=args.expert_start and iters_so_far<=args.expert_end:
                 ## Expert train
                 # # learn how to stop
-                # ob_expert, ac_expert = env.get_expert(optim_batchsize, is_final=True)
-                # losses_expert_stop, g_expert = lossandgrad_expert_stop(ob_expert['adj'], ob_expert['node'], ac_expert,ac_expert)
-                # adam_pi_stop.update(g_expert, optim_stepsize * cur_lrmult/10)
-                # losses_stop.append(losses_expert_stop)
+                ob_expert, ac_expert = env.get_expert(optim_batchsize, is_final=True)
+                loss_expert_stop, g_expert_stop = lossandgrad_expert_stop(ob_expert['adj'], ob_expert['node'], ac_expert,ac_expert)
+                loss_expert_stop = np.mean(loss_expert_stop)
 
                 ob_expert, ac_expert = env.get_expert(optim_batchsize)
                 loss_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
@@ -619,6 +618,7 @@ def learn(args,env, policy_fn, *,
                     # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
             # update generator
+            adam_pi_stop.update(0.5*g_expert_stop, optim_stepsize * cur_lrmult)
             adam_pi.update(g_ppo+0.5*g_expert, optim_stepsize * cur_lrmult)
 
         # WGAN
@@ -656,6 +656,9 @@ def learn(args,env, policy_fn, *,
             writer.add_scalar('grad_expert_min', np.amin(g_expert), iters_so_far)
             writer.add_scalar('grad_expert_max', np.amax(g_expert), iters_so_far)
             writer.add_scalar('grad_expert_norm', np.linalg.norm(g_expert), iters_so_far)
+            writer.add_scalar('grad_expert_stop_min', np.amin(g_expert_stop), iters_so_far)
+            writer.add_scalar('grad_expert_stop_max', np.amax(g_expert_stop), iters_so_far)
+            writer.add_scalar('grad_expert_stop_norm', np.linalg.norm(g_expert_stop), iters_so_far)
             writer.add_scalar('grad_rl_min', np.amin(g_ppo), iters_so_far)
             writer.add_scalar('grad_rl_max', np.amax(g_ppo), iters_so_far)
             writer.add_scalar('grad_rl_norm', np.linalg.norm(g_ppo), iters_so_far)
