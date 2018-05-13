@@ -620,7 +620,7 @@ def learn(args,env, policy_fn, *,
             # update generator
             adam_pi_stop.update(0.5*g_expert_stop, optim_stepsize * cur_lrmult)
             adam_pi.update(0.5*g_expert, optim_stepsize * cur_lrmult)
-            adam_pi.update(0.5*g_expert, optim_stepsize * cur_lrmult)
+            # adam_pi.update(0.5*g_expert, optim_stepsize * cur_lrmult)
 
         # WGAN
         # if args.has_d_step == 1:
