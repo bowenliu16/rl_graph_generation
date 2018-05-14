@@ -46,7 +46,7 @@ def train(args,seed,writer=None):
         max_timesteps=args.num_steps,
         timesteps_per_actorbatch=256,
         clip_param=0.2, entcoeff=0.01,
-        optim_epochs=4, optim_stepsize=args.lr, optim_batchsize=32,
+        optim_epochs=8, optim_stepsize=args.lr, optim_batchsize=32,
         gamma=1, lam=0.95,
         schedule='linear', writer=writer
     )
