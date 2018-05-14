@@ -683,7 +683,11 @@ class MoleculeEnv(gym.Env):
             if is_final:
                 edges_sub_len = len(edges)
             else:
-                edges_sub_len = random.randint(1,len(edges))
+                # edges_sub_len = random.randint(1,len(edges))
+                edges_sub_len = random.randint(1,len(edges)+1)
+                if edges_sub_len==len(edges)+1:
+                    edges_sub_len = len(edges)
+                    is_final=True
             edges_sub = random.sample(edges,k=edges_sub_len)
             graph_sub = nx.Graph(edges_sub)
             graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)

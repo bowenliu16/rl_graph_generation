@@ -606,9 +606,9 @@ def learn(args,env, policy_fn, *,
             if iters_so_far>=args.expert_start and iters_so_far<=args.expert_end:
                 ## Expert train
                 # # # learn how to stop
-                ob_expert, ac_expert = env.get_expert(optim_batchsize, is_final=True)
-                loss_expert_stop, g_expert_stop = lossandgrad_expert_stop(ob_expert['adj'], ob_expert['node'], ac_expert,ac_expert)
-                loss_expert_stop = np.mean(loss_expert_stop)
+                # ob_expert, ac_expert = env.get_expert(optim_batchsize, is_final=True)
+                # loss_expert_stop, g_expert_stop = lossandgrad_expert_stop(ob_expert['adj'], ob_expert['node'], ac_expert,ac_expert)
+                # loss_expert_stop = np.mean(loss_expert_stop)
 
                 ob_expert, ac_expert = env.get_expert(optim_batchsize)
                 loss_expert, g_expert = lossandgrad_expert(ob_expert['adj'], ob_expert['node'], ac_expert, ac_expert)
@@ -644,7 +644,7 @@ def learn(args,env, policy_fn, *,
                     # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
             # update generator
-            adam_pi_stop.update(0.1*g_expert_stop, optim_stepsize * cur_lrmult)
+            # adam_pi_stop.update(0.1*g_expert_stop, optim_stepsize * cur_lrmult)
             adam_pi.update(g_ppo+0.1*g_expert, optim_stepsize * cur_lrmult)
 
         # WGAN
