@@ -425,7 +425,7 @@ def learn(args,env, policy_fn, *,
     if args.gan_type=='normal':
         loss_g_step_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_gen, labels=tf.zeros_like(step_logit_gen)))
     elif args.gan_type=='recommend':
-        loss_g_step_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_gen, labels=tf.ones_like(step_logit_real)*0.9))
+        loss_g_step_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_gen, labels=tf.ones_like(step_logit_gen)*0.9))
 
 
 
@@ -437,7 +437,7 @@ def learn(args,env, policy_fn, *,
     if args.gan_type == 'normal':
         loss_g_final_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_gen, labels=tf.zeros_like(final_logit_gen)))
     elif args.gan_type == 'recommend':
-        loss_g_final_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_gen, labels=tf.ones_like(step_logit_real)*0.9))
+        loss_g_final_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_gen, labels=tf.ones_like(final_logit_gen)*0.9))
 
 
     var_list_pi = pi.get_trainable_variables()
