@@ -427,7 +427,8 @@ def learn(args,env, policy_fn, *,
     elif args.gan_type=='recommend':
         loss_g_step_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=step_logit_gen, labels=tf.ones_like(step_logit_gen)*0.9))
     elif args.gan_type=='wgan':
-        loss_d_step, _, _ = -1*discriminator(ob_real, ob_gen,args, name='d_step')
+        loss_d_step, _, _ = discriminator(ob_real, ob_gen,args, name='d_step')
+        loss_d_step = loss_d_step*-1
         loss_g_step_gen,_ = discriminator_net(ob_gen,args, name='d_step')
 
 
@@ -441,7 +442,8 @@ def learn(args,env, policy_fn, *,
     elif args.gan_type == 'recommend':
         loss_g_final_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=final_logit_gen, labels=tf.ones_like(final_logit_gen)*0.9))
     elif args.gan_type=='wgan':
-        loss_d_final, _, _ = -1*discriminator(ob_real, ob_gen,args, name='d_final')
+        loss_d_final, _, _ = discriminator(ob_real, ob_gen,args, name='d_final')
+        loss_d_final = loss_d_final*-1
         loss_g_step_gen,_ = discriminator_net(ob_gen,args, name='d_final')
 
 
