@@ -602,8 +602,10 @@ def learn(args,env, policy_fn, *,
             g_d_step = 0
             g_d_final = 0
 
+
+            pretrain_shift = 5
             ## Expert
-            if iters_so_far>=args.expert_start and iters_so_far<=args.expert_end:
+            if iters_so_far>=args.expert_start and iters_so_far<=args.expert_end+pretrain_shift:
                 ## Expert train
                 # # # learn how to stop
                 # ob_expert, ac_expert = env.get_expert(optim_batchsize, is_final=True)
@@ -621,7 +623,7 @@ def learn(args,env, policy_fn, *,
                 batch = d.next_batch(optim_batchsize)
                 # ppo
                 # if args.has_ppo==1:
-                if iters_so_far >= args.rl_start+5: # start generator after discriminator trained a well..
+                if iters_so_far >= args.rl_start+pretrain_shift: # start generator after discriminator trained a well..
                     *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                     losses_ppo=newlosses
 
@@ -645,10 +647,11 @@ def learn(args,env, policy_fn, *,
 
             # update generator
             # adam_pi_stop.update(0.1*g_expert_stop, optim_stepsize * cur_lrmult)
-            if g_expert==0:
-                adam_pi.update(g_ppo, optim_stepsize * cur_lrmult)
-            else:
-                adam_pi.update(g_ppo+0.1*g_expert, optim_stepsize * cur_lrmult)
+
+            # if g_expert==0:
+            #     adam_pi.update(g_ppo, optim_stepsize * cur_lrmult)
+            # else:
+            adam_pi.update(g_ppo+0.1*g_expert, optim_stepsize * cur_lrmult)
 
         # WGAN
         # if args.has_d_step == 1:
