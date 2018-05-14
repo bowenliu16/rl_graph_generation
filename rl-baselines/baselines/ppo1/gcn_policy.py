@@ -145,7 +145,7 @@ def discriminator_net(ob,args,name='d_net'):
             emb_node_gate = tf.layers.dense(emb_node,1,activation=tf.nn.sigmoid,name='gate')
             emb_graph = tf.reduce_sum(tf.squeeze(emb_node*emb_node_gate, axis=1),axis=1)  # B*f
         else:
-            emb_graph = tf.reduce_max(tf.squeeze(emb_node, axis=1), axis=1)  # B*f
+            emb_graph = tf.reduce_sum(tf.squeeze(emb_node, axis=1), axis=1)  # B*f
         logit = tf.layers.dense(emb_graph, 1, activation=None, name='linear2')
         pred = tf.sigmoid(logit)
         # pred = tf.layers.dense(emb_graph, 1, activation=None, name='linear1')
@@ -219,7 +219,7 @@ class GCNPolicy(object):
         emb_stop = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, use_bias=False, name='linear_stop1')
         if args.bn==1:
             emb_stop = tf.layers.batch_normalization(emb_stop,axis=-1)
-        self.logits_stop = tf.reduce_max(emb_stop,axis=1)
+        self.logits_stop = tf.reduce_sum(emb_stop,axis=1)
         self.logits_stop = tf.layers.dense(self.logits_stop, 2, activation=None, name='linear_stop2_1')  # B*2
         # explicitly show node num
         # self.logits_stop = tf.concat((tf.reduce_mean(tf.layers.dense(emb_node, 32, activation=tf.nn.relu, name='linear_stop1'),axis=1),tf.reshape(ob_len_first/5,[-1,1])),axis=1)
