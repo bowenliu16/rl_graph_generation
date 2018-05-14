@@ -659,6 +659,7 @@ class MoleculeEnv(gym.Env):
         ### select molecule
         dataset_len = len(self.dataset)
         for i in range(batch_size):
+            is_final_temp = is_final
             # print('--------------------------------------------------')
             ### get a subgraph
             if curriculum==1:
@@ -680,18 +681,18 @@ class MoleculeEnv(gym.Env):
             #     is_final = True
 
             # select the edge num for the subgraph
-            if is_final:
+            if is_final_temp:
                 edges_sub_len = len(edges)
             else:
                 # edges_sub_len = random.randint(1,len(edges))
                 edges_sub_len = random.randint(1,len(edges)+1)
                 if edges_sub_len==len(edges)+1:
                     edges_sub_len = len(edges)
-                    is_final=True
+                    is_final_temp=True
             edges_sub = random.sample(edges,k=edges_sub_len)
             graph_sub = nx.Graph(edges_sub)
             graph_sub = max(nx.connected_component_subgraphs(graph_sub), key=len)
-            if is_final: # when the subgraph the whole molecule, the expert show stop sign
+            if is_final_temp: # when the subgraph the whole molecule, the expert show stop sign
                 node1 = random.randint(0,mol.GetNumAtoms()-1)
                 while True:
                     node2 = random.randint(0,mol.GetNumAtoms()+atom_type_num-1)
