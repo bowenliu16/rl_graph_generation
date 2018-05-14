@@ -103,7 +103,7 @@ def molecule_arg_parser():
     parser.add_argument('--normalize_adj', type=int, default=0)
     parser.add_argument('--layer_num', type=int, default=3)
     parser.add_argument('--graph_emb', type=int, default=0)
-    parser.add_argument('--stop_shift', type=int, default=-1)
+    parser.add_argument('--stop_shift', type=int, default=-3)
     parser.add_argument('--has_residual', type=int, default=0)
     parser.add_argument('--has_concat', type=int, default=0)
     parser.add_argument('--has_feature', type=int, default=0)
