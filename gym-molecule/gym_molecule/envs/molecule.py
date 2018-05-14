@@ -185,7 +185,7 @@ class MoleculeEnv(gym.Env):
         total_atoms = self.mol.GetNumAtoms()
 
         ### take action
-        if action[0,3]==0: # not stop
+        if action[0,3]==0 or self.counter < self.min_action: # not stop
             stop = False
             if action[0, 1] >= total_atoms:
                 self._add_atom(action[0, 1] - total_atoms)  # add new node
@@ -1573,10 +1573,11 @@ if __name__ == '__main__':
     m_env.init(data_type='zinc')
 
     ob,ac = m_env.get_expert(batch_size=5)
+    # print(ob['adj'].shape,ob['node'].shape)
     np.set_printoptions(precision=2,linewidth=200)
 
-    # for i in range(ob['node'].shape[2]):
-    #     print(ob['node'][0,0,i])
+    for i in range(ob['node'].shape[2]):
+        print(ob['node'][0,0,i])
     # print('adj')
     # for i in range(ob['adj'].shape[2]):
     #     print(ob['adj'][0, 0, i])
