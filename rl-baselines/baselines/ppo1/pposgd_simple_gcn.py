@@ -651,7 +651,7 @@ def learn(args,env, policy_fn, *,
             # if g_expert==0:
             #     adam_pi.update(g_ppo, optim_stepsize * cur_lrmult)
             # else:
-            adam_pi.update(g_ppo+0.1*g_expert, optim_stepsize * cur_lrmult)
+            adam_pi.update(0.1*g_ppo+0.1*g_expert, optim_stepsize * cur_lrmult)
 
         # WGAN
         # if args.has_d_step == 1:
