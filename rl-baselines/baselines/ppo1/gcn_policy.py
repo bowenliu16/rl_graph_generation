@@ -47,7 +47,8 @@ def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, 
     with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
         W = tf.get_variable("W", [1, edge_dim, in_channels, out_channels],initializer=tf.glorot_uniform_initializer())
         b = tf.get_variable("b", [1, edge_dim, 1, out_channels])
-        node_embedding = adj@tf.tile(node_feature,[1,edge_dim,1,1])@tf.tile(W,[batch_size,1,1,1])+b # todo: tf.tile sum the gradients, may need to change
+        # node_embedding = adj@tf.tile(node_feature,[1,edge_dim,1,1])@tf.tile(W,[batch_size,1,1,1])+b # todo: tf.tile sum the gradients, may need to change
+        node_embedding = adj@tf.tile(node_feature,[1,edge_dim,1,1])@tf.tile(W,[batch_size,1,1,1]) # todo: tf.tile sum the gradients, may need to change
         if is_act:
             node_embedding = tf.nn.relu(node_embedding)
         if aggregate == 'sum':
