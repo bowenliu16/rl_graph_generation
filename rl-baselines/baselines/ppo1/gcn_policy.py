@@ -136,7 +136,7 @@ def discriminator_net(ob,args,name='d_net'):
         if args.bn==1:
             emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
         # emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
-        emb_node = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear1')
+        emb_node = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, use_bias=False, name='linear1')
         if args.bn==1:
             emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
 
@@ -216,7 +216,7 @@ class GCNPolicy(object):
             emb_node = tf.concat([emb_node, emb_graph], axis=2)
 
         ### 2 predict stop
-        emb_stop = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='linear_stop1')
+        emb_stop = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, use_bias=False, name='linear_stop1')
         if args.bn==1:
             emb_stop = tf.layers.batch_normalization(emb_stop,axis=-1)
         self.logits_stop = tf.reduce_sum(emb_stop,axis=1)
@@ -314,11 +314,11 @@ class GCNPolicy(object):
 
         # ncat_list = [tf.shape(logits_first),ob_space['adj'].shape[-1],ob_space['adj'].shape[0]]
         self.pd = self.pdtype(-1).pdfromflat([self.logits_first,self.logits_second_real,self.logits_edge_real,self.logits_stop])
-        self.vpred = tf.layers.dense(emb_node, args.emb_size, activation=tf.nn.relu, name='value1')
+        self.vpred = tf.layers.dense(emb_node, args.emb_size, use_bias=False, activation=tf.nn.relu, name='value1')
         if args.bn==1:
             self.vpred = tf.layers.batch_normalization(self.vpred,axis=-1)
+        self.vpred = tf.reduce_sum(self.vpred,axis=1)
         self.vpred = tf.layers.dense(self.vpred, 1, activation=None, name='value2')
-        self.vpred = tf.reduce_mean(self.vpred,axis=1)
 
         self.state_in = []
         self.state_out = []
