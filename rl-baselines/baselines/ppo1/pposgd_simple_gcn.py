@@ -444,7 +444,7 @@ def learn(args,env, policy_fn, *,
     elif args.gan_type=='wgan':
         loss_d_final, _, _ = discriminator(ob_real, ob_gen,args, name='d_final')
         loss_d_final = loss_d_final*-1
-        loss_g_step_gen,_ = discriminator_net(ob_gen,args, name='d_final')
+        loss_g_final_gen,_ = discriminator_net(ob_gen,args, name='d_final')
 
 
     var_list_pi = pi.get_trainable_variables()
@@ -625,14 +625,14 @@ def learn(args,env, policy_fn, *,
                     *newlosses, g_ppo = lossandgrad_ppo(batch["ob_adj"], batch["ob_node"], batch["ac"], batch["ac"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
                     losses_ppo=newlosses
 
-                if args.has_d_step==1 and i_optim<=optim_epochs//2:
+                if args.has_d_step==1 and i_optim>=optim_epochs//2:
                     # update step discriminator
                     ob_expert, _ = env.get_expert(optim_batchsize,curriculum=args.curriculum,level_total=args.curriculum_num,level=level)
                     loss_d_step, g_d_step = lossandgrad_d_step(ob_expert["adj"], ob_expert["node"], batch["ob_adj"], batch["ob_node"])
                     adam_d_step.update(g_d_step, optim_stepsize * cur_lrmult)
                     loss_d_step = np.mean(loss_d_step)
 
-                if args.has_d_final==1 and i_optim<=optim_epochs//4:
+                if args.has_d_final==1 and i_optim>=optim_epochs//4*3:
                     # update final discriminator
                     ob_expert, _ = env.get_expert(optim_batchsize, is_final=True, curriculum=args.curriculum,level_total=args.curriculum_num, level=level)
                     seg_final_adj, seg_final_node = traj_final_generator(pi, copy.deepcopy(env), optim_batchsize,True)
