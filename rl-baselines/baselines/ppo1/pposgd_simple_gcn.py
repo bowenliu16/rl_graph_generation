@@ -644,8 +644,8 @@ def learn(args,env, policy_fn, *,
                     # logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
             # update generator
-            adam_pi_stop.update(0.5*g_expert_stop, optim_stepsize * cur_lrmult)
-            adam_pi.update(g_ppo+0.5*g_expert, optim_stepsize * cur_lrmult)
+            adam_pi_stop.update(0.1*g_expert_stop, optim_stepsize * cur_lrmult)
+            adam_pi.update(g_ppo+0.1*g_expert, optim_stepsize * cur_lrmult)
 
         # WGAN
         # if args.has_d_step == 1:

@@ -74,6 +74,7 @@ class MoleculeEnv(gym.Env):
 
     def __init__(self):
         pass
+
     def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False):
         '''
         own init function, since gym does not support passing argument
@@ -153,6 +154,10 @@ class MoleculeEnv(gym.Env):
 
     def level_up(self):
         self.level += 1
+
+    def seed(self,seed):
+        np.random.seed(seed=seed)
+        random.seed(seed)
 
     def normalize_adj(self,adj):
         degrees = np.sum(adj,axis=2)
