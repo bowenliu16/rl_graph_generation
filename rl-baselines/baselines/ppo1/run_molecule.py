@@ -92,7 +92,7 @@ def molecule_arg_parser():
     parser.add_argument('--rl_end', type=int, default=int(1e6))
     parser.add_argument('--expert_start', type=int, default=0)
     parser.add_argument('--expert_end', type=int, default=int(1e6))
-    parser.add_argument('--save_every', type=int, default=100)
+    parser.add_argument('--save_every', type=int, default=200)
     parser.add_argument('--load', type=int, default=0)
     parser.add_argument('--load_step', type=int, default=250)
     # parser.add_argument('--load_step', type=int, default=0)

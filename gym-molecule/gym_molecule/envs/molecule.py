@@ -109,10 +109,11 @@ class MoleculeEnv(gym.Env):
         self.possible_bond_types = np.array(possible_bonds, dtype=object)
 
         if self.has_feature:
-            self.d_n = len(self.possible_atom_types) + len(
-                self.possible_formal_charge) + len(
-                self.possible_implicit_valence) + len(self.possible_ring_atom) + \
-                  len(self.possible_degree) + len(self.possible_hybridization)
+            # self.d_n = len(self.possible_atom_types) + len(
+            #     self.possible_formal_charge) + len(
+            #     self.possible_implicit_valence) + len(self.possible_ring_atom) + \
+            #       len(self.possible_degree) + len(self.possible_hybridization)
+            self.d_n = len(self.possible_atom_types)+6# 6 is the ring feature
         else:
             self.d_n = len(self.possible_atom_types)
 
@@ -553,17 +554,29 @@ class MoleculeEnv(gym.Env):
                 hybridization = a.GetHybridization()
             # print(atom_symbol,formal_charge,implicit_valence,ring_atom,degree,hybridization)
             if self.has_feature:
+                # float_array = np.concatenate([(atom_symbol ==
+                #                                self.possible_atom_types),
+                #                               (formal_charge ==
+                #                                self.possible_formal_charge),
+                #                               (implicit_valence ==
+                #                                self.possible_implicit_valence),
+                #                               (ring_atom ==
+                #                                self.possible_ring_atom),
+                #                               (degree == self.possible_degree),
+                #                               (hybridization ==
+                #                                self.possible_hybridization)]).astype(float)
                 float_array = np.concatenate([(atom_symbol ==
                                                self.possible_atom_types),
-                                              (formal_charge ==
-                                               self.possible_formal_charge),
-                                              (implicit_valence ==
-                                               self.possible_implicit_valence),
-                                              (ring_atom ==
-                                               self.possible_ring_atom),
-                                              (degree == self.possible_degree),
-                                              (hybridization ==
-                                               self.possible_hybridization)]).astype(float)
+                                              (not a.IsInRing()),
+                                              (a.IsInRingSize(3)),
+                                              (a.IsInRingSize(4)),
+                                              (a.IsInRingSize(5)),
+                                              (a.IsInRingSize(6)),
+                                              (a.IsInRing() and (not a.IsInRingSize(3))
+                                               and (not a.IsInRingSize(4))
+                                               and (not a.IsInRingSize(5))
+                                               and (not a.IsInRingSize(6))
+                                               )]).astype(float)
             else:
                 float_array = (atom_symbol == self.possible_atom_types).astype(float)
             # assert float_array.sum() == 6   # because there are 6 types of one
@@ -732,17 +745,32 @@ class MoleculeEnv(gym.Env):
             n = graph_sub.number_of_nodes()
             for node_id, node in enumerate(graph_sub.nodes()):
                 if self.has_feature:
+                    # float_array = np.concatenate([(graph.node[node]['symbol'] ==
+                    #                                self.possible_atom_types),
+                    #                               (graph.node[node]['formal_charge'] ==
+                    #                                self.possible_formal_charge),
+                    #                               (graph.node[node]['implicit_valence'] ==
+                    #                                self.possible_implicit_valence),
+                    #                               (graph.node[node]['ring_atom'] ==
+                    #                                self.possible_ring_atom),
+                    #                               (graph.node[node]['degree'] == self.possible_degree),
+                    #                               (graph.node[node]['hybridization'] ==
+                    #                                self.possible_hybridization)]).astype(float)
+                    cycle_info = nx.cycle_basis(graph_sub, node)
+                    cycle_len_info = [len(cycle) for cycle in cycle_info]
+                    print(cycle_len_info)
                     float_array = np.concatenate([(graph.node[node]['symbol'] ==
                                                    self.possible_atom_types),
-                                                  (graph.node[node]['formal_charge'] ==
-                                                   self.possible_formal_charge),
-                                                  (graph.node[node]['implicit_valence'] ==
-                                                   self.possible_implicit_valence),
-                                                  (graph.node[node]['ring_atom'] ==
-                                                   self.possible_ring_atom),
-                                                  (graph.node[node]['degree'] == self.possible_degree),
-                                                  (graph.node[node]['hybridization'] ==
-                                                   self.possible_hybridization)]).astype(float)
+                                                  ([len(cycle_info)==0]),
+                                                  ([3 in cycle_len_info]),
+                                                  ([4 in cycle_len_info]),
+                                                  ([5 in cycle_len_info]),
+                                                  ([6 in cycle_len_info]),
+                                                  ([len(cycle_info)!=0 and (not 3 in cycle_len_info)
+                                                   and (not 4 in cycle_len_info)
+                                                   and (not 5 in cycle_len_info)
+                                                   and (not 6 in cycle_len_info)]
+                                                   )]).astype(float)
                 else:
                     float_array = (graph.node[node]['symbol'] == self.possible_atom_types).astype(float)
 
@@ -1575,7 +1603,7 @@ if __name__ == '__main__':
     ## debug
     print('debug')
     m_env = MoleculeEnv()
-    m_env.init(data_type='zinc')
+    m_env.init(data_type='zinc',has_feature=True)
 
     ob,ac = m_env.get_expert(batch_size=5)
     # print(ob['adj'].shape,ob['node'].shape)

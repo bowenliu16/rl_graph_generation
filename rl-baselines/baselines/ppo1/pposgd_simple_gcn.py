@@ -98,21 +98,21 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
             cur_ep_len_valid += 1
             # add stepwise discriminator reward
             if args.has_d_step==1:
-                if args.gan_type=='normal' or 'wgan':
+                if args.gan_type=='normal' or args.gan_type=='wgan':
                     rew_d_step = args.gan_step_ratio * (
                         d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :])) / env.max_atom
                 elif args.gan_type == 'recommend':
                     rew_d_step = args.gan_step_ratio * (
-                        max(-d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :]),-2)) / env.max_atom
+                        max(1-d_step_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :]),-2)) / env.max_atom
         rew_d_final = 0 # default
         if new:
             if args.has_d_final==1:
-                if args.gan_type == 'normal' or 'wgan':
+                if args.gan_type == 'normal' or args.gan_type=='wgan':
                     rew_d_final = args.gan_final_ratio * (
                         d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :]))
                 elif args.gan_type == 'recommend':
                     rew_d_final = args.gan_final_ratio * (
-                        max( - d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :]),
+                        max(1 - d_final_func(ob['adj'][np.newaxis, :, :, :], ob['node'][np.newaxis, :, :, :]),
                             -2))
 
         rews[i] = rew_d_step + rew_env +rew_d_final
