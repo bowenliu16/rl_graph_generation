@@ -248,7 +248,7 @@ class MoleculeEnv(gym.Env):
                     # reward_logp += MolLogP(self.mol)/10 * self.logp_ratio
                     reward_logp += reward_penalized_log_p(final_mol) * self.logp_ratio
                     if self.reward_type == 'logppen':
-                        reward_final += reward_penalized_log_p(final_mol)/3
+                        reward_final += reward_penalized_log_p(final_mol)
                     elif self.reward_type == 'logp_target':
                         # reward_final += reward_target(final_mol,target=self.reward_target,ratio=0.5,val_max=2,val_min=-2,func=MolLogP)
                         # reward_final += reward_target_logp(final_mol,target=self.reward_target)
