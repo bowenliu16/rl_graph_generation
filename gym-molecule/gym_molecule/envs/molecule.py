@@ -567,15 +567,15 @@ class MoleculeEnv(gym.Env):
                 #                                self.possible_hybridization)]).astype(float)
                 float_array = np.concatenate([(atom_symbol ==
                                                self.possible_atom_types),
-                                              (not a.IsInRing()),
-                                              (a.IsInRingSize(3)),
-                                              (a.IsInRingSize(4)),
-                                              (a.IsInRingSize(5)),
-                                              (a.IsInRingSize(6)),
-                                              (a.IsInRing() and (not a.IsInRingSize(3))
+                                              ([not a.IsInRing()]),
+                                              ([a.IsInRingSize(3)]),
+                                              ([a.IsInRingSize(4)]),
+                                              ([a.IsInRingSize(5)]),
+                                              ([a.IsInRingSize(6)]),
+                                              ([a.IsInRing() and (not a.IsInRingSize(3))
                                                and (not a.IsInRingSize(4))
                                                and (not a.IsInRingSize(5))
-                                               and (not a.IsInRingSize(6))
+                                               and (not a.IsInRingSize(6))]
                                                )]).astype(float)
             else:
                 float_array = (atom_symbol == self.possible_atom_types).astype(float)
