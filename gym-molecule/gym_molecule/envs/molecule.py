@@ -758,7 +758,7 @@ class MoleculeEnv(gym.Env):
                     #                                self.possible_hybridization)]).astype(float)
                     cycle_info = nx.cycle_basis(graph_sub, node)
                     cycle_len_info = [len(cycle) for cycle in cycle_info]
-                    print(cycle_len_info)
+                    # print(cycle_len_info)
                     float_array = np.concatenate([(graph.node[node]['symbol'] ==
                                                    self.possible_atom_types),
                                                   ([len(cycle_info)==0]),
