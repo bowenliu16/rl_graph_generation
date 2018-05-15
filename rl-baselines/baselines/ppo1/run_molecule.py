@@ -9,6 +9,7 @@ from baselines import logger
 # from baselines.common.cmd_util import atari_arg_parser
 from tensorboardX import SummaryWriter
 import os
+import tensorflow as tf
 
 import gym
 from gym_molecule.envs.molecule import GraphEnv
