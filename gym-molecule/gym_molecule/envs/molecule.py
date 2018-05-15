@@ -250,15 +250,18 @@ class MoleculeEnv(gym.Env):
                     if self.reward_type == 'logppen':
                         reward_final += reward_penalized_log_p(final_mol)/3
                     elif self.reward_type == 'logp_target':
-                        reward_final += reward_target(final_mol,target=self.reward_target,ratio=0.5,val_max=2,val_min=-2,func=MolLogP)
+                        # reward_final += reward_target(final_mol,target=self.reward_target,ratio=0.5,val_max=2,val_min=-2,func=MolLogP)
+                        reward_final += reward_target_logp(final_mol,target=self.reward_target)
                     elif self.reward_type == 'qed':
                         reward_final += reward_qed*2
                     elif self.reward_type == 'qedsa':
                         reward_final += (reward_qed*1.5 + reward_sa*0.5)
                     elif self.reward_type == 'qed_target':
-                        reward_final += reward_target(final_mol,target=self.reward_target,ratio=0.1,val_max=2,val_min=-2,func=qed)
+                        # reward_final += reward_target(final_mol,target=self.reward_target,ratio=0.1,val_max=2,val_min=-2,func=qed)
+                        reward_final += reward_target_qed(final_mol,target=self.reward_target)
                     elif self.reward_type == 'mw_target':
-                        reward_final += reward_target(final_mol,target=self.reward_target,ratio=40,val_max=2,val_min=-2,func=rdMolDescriptors.CalcExactMolWt)
+                        # reward_final += reward_target(final_mol,target=self.reward_target,ratio=40,val_max=2,val_min=-2,func=rdMolDescriptors.CalcExactMolWt)
+                        reward_final += reward_target_mw(final_mol,target=self.reward_target)
                     elif self.reward_type == 'gan':
                         reward_final = 0
                     else:
