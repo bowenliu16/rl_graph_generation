@@ -251,7 +251,8 @@ class MoleculeEnv(gym.Env):
                         reward_final += reward_penalized_log_p(final_mol)/3
                     elif self.reward_type == 'logp_target':
                         # reward_final += reward_target(final_mol,target=self.reward_target,ratio=0.5,val_max=2,val_min=-2,func=MolLogP)
-                        reward_final += reward_target_logp(final_mol,target=self.reward_target)
+                        # reward_final += reward_target_logp(final_mol,target=self.reward_target)
+                        reward_final += reward_target_new(final_mol,MolLogP ,x_start=self.reward_target, x_mid=self.reward_target+0.25)
                     elif self.reward_type == 'qed':
                         reward_final += reward_qed*2
                     elif self.reward_type == 'qedsa':
@@ -261,7 +262,10 @@ class MoleculeEnv(gym.Env):
                         reward_final += reward_target_qed(final_mol,target=self.reward_target)
                     elif self.reward_type == 'mw_target':
                         # reward_final += reward_target(final_mol,target=self.reward_target,ratio=40,val_max=2,val_min=-2,func=rdMolDescriptors.CalcExactMolWt)
-                        reward_final += reward_target_mw(final_mol,target=self.reward_target)
+                        # reward_final += reward_target_mw(final_mol,target=self.reward_target)
+                        reward_final += reward_target_new(final_mol, rdMolDescriptors.CalcExactMolWt,x_start=self.reward_target, x_mid=self.reward_target+25)
+
+
                     elif self.reward_type == 'gan':
                         reward_final = 0
                     else:
@@ -1415,6 +1419,13 @@ def reward_target(mol, target, ratio, val_max, val_min, func):
     x = func(mol)
     reward = max(-1*np.abs((x-target)/ratio) + val_max,val_min)
     return reward
+
+# def f(x,r_max1=4,r_max2=2.25,r_mid=2,r_min=-2,x_start=150, x_mid=175):
+#     return max((r_max1-r_mid)/(x_start-x_mid)*np.abs(x-x_mid)+r_max1, (r_max2-r_mid)/(x_start-x_mid)*np.abs(x-x_mid)+r_max2,r_min)
+
+def reward_target_new(mol, func,r_max1=4,r_max2=2.25,r_mid=2,r_min=-2,x_start=500, x_mid=525):
+    x = func(mol)
+    return max((r_max1-r_mid)/(x_start-x_mid)*np.abs(x-x_mid)+r_max1, (r_max2-r_mid)/(x_start-x_mid)*np.abs(x-x_mid)+r_max2,r_min)
 
 def reward_target_logp(mol, target,ratio=0.5,max=4):
     """
