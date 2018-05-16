@@ -304,7 +304,10 @@ class MoleculeEnv(gym.Env):
             reward = reward_step + reward_valid + reward_final
             # reward = reward_step + reward_valid + reward_qed*2
             info['smile'] = self.get_final_smiles()
-            info['reward_valid'] = self.conditional[-1] ### temp change
+            if self.is_conditional:
+                info['reward_valid'] = self.conditional[-1] ### temp change
+            else:
+                info['reward_valid'] = reward_valid
             info['reward_qed'] = reward_qed
             info['reward_sa'] = reward_sa
             info['final_stat'] = reward_final
