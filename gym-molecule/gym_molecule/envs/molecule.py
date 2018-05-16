@@ -86,6 +86,7 @@ class MoleculeEnv(gym.Env):
         self.reward_target = reward_target
         if self.is_conditional:
             self.mol = Chem.RWMol(Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3'))
+            Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
         self.smile_list = []
@@ -613,7 +614,10 @@ class MoleculeEnv(gym.Env):
             end_idx = b.GetEndAtomIdx()
             bond_type = b.GetBondType()
             float_array = (bond_type == self.possible_bond_types).astype(float)
-            assert float_array.sum() != 0
+            try:
+                assert float_array.sum() != 0
+            except:
+                print('error',bond_type)
             E[:, begin_idx, end_idx] = float_array
             E[:, end_idx, begin_idx] = float_array
         ob = {}
