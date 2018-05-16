@@ -67,17 +67,31 @@ def load_scaffold():
 
 
 
-def load_conditional():
-    cwd = os.path.dirname(__file__)
-    path = os.path.join(os.path.dirname(cwd), 'dataset',
-                        'opt.test.logP-SA')
-    import csv
-    with open(path, 'r') as fp:
-        reader = csv.reader(fp, delimiter=' ', quotechar='"')
-        data = [row+[id] for id,row in enumerate(reader)]
-    # print(len(data))
-    # print(data[799])
+def load_conditional(type='low'):
+    if type=='low':
+        cwd = os.path.dirname(__file__)
+        path = os.path.join(os.path.dirname(cwd), 'dataset',
+                            'opt.test.logP-SA')
+        import csv
+        with open(path, 'r') as fp:
+            reader = csv.reader(fp, delimiter=' ', quotechar='"')
+            data = [row+[id] for id,row in enumerate(reader)]
+        # print(len(data))
+        # print(data[799])
+    elif type=='high':
+        cwd = os.path.dirname(__file__)
+        path = os.path.join(os.path.dirname(cwd), 'dataset',
+                            'zinc_plogp_sorted.csv')
+        import csv
+        with open(path, 'r') as fp:
+            reader = csv.reader(fp, delimiter=',', quotechar='"')
+            data = [[row[1], row[0],id] for id, row in enumerate(reader)]
+            # data = [row for id, row in enumerate(reader)]
+            data = data[0:800]
     return data
+# data = load_conditional('low')
+# data = load_conditional('high')
+# print(data[799])
 
 
 class MoleculeEnv(gym.Env):
@@ -87,18 +101,17 @@ class MoleculeEnv(gym.Env):
     def __init__(self):
         pass
 
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False,conditional=None,max_action=128,min_action=20):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False,conditional='low',max_action=128,min_action=20):
         '''
         own init function, since gym does not support passing argument
         '''
         self.is_normalize = bool(is_normalize)
         self.is_conditional = is_conditional
-        # self.conditional = conditional
         self.has_feature = has_feature
         self.reward_type = reward_type
         self.reward_target = reward_target
 
-        self.conditional_list = load_conditional()
+        self.conditional_list = load_conditional(conditional)
         if self.is_conditional:
             self.conditional = random.sample(self.conditional_list,1)[0]
             self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional[0]))
@@ -143,7 +156,10 @@ class MoleculeEnv(gym.Env):
         if data_type=='gdb':
             self.max_atom = 13 + len(possible_atoms) # gdb 13
         elif data_type=='zinc':
-            self.max_atom = 38 + len(possible_atoms) # ZINC  + self.min_action
+            if self.is_conditional:
+                self.max_atom = 38 + len(possible_atoms) + self.min_action # ZINC
+            else:
+                self.max_atom = 38 + len(possible_atoms) # ZINC  + self.min_action
 
         self.logp_ratio = logp_ratio
         self.qed_ratio = qed_ratio
@@ -232,7 +248,12 @@ class MoleculeEnv(gym.Env):
 
         ### calculate terminal rewards
         # todo: add terminal action
-        if (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop) and self.counter >= self.min_action:
+
+        if self.is_conditional:
+            terminate_condition = (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]-self.min_action or self.counter >= self.max_action or stop) and self.counter >= self.min_action
+        else:
+            terminate_condition = (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop) and self.counter >= self.min_action
+        if terminate_condition:
             # default reward
             reward_valid = 2
             reward_qed = 0
@@ -1669,22 +1690,22 @@ if __name__ == '__main__':
 
 
 
-    bryostatin_smiles = "CCC/C=C/C=C/C(=O)O[C@H]1/C(=C/C(=O)OC)/C[C@H]2C[C@@H](OC(=O)[C@@H](CC[C@@H]3C[C@@H](C([C@@](O3)(C[C@@H]4C/C(=C/C(=O)OC)/C[C@@H](O4)/C=C/C([C@@]1(O2)O)(C)C)O)(C)C)OC(=O)C)O)[C@@H](C)O"
-
-
-    def smiles_to_fp_vector(smiles, radius=2, useChirality=True):
-        """
-        Outputs morgan fingerprint array of dim 1 x 2048
-        """
-        m = AllChem.MolFromSmiles(smiles)
-        fp = AllChem.GetMorganFingerprintAsBitVect(m, radius=radius, useChirality=useChirality)
-        fp_vector = np.array(fp).reshape(1, -1)
-        return fp_vector
-
-
-    print(smiles_to_fp_vector(bryostatin_smiles))
-    print(len(smiles_to_fp_vector(bryostatin_smiles)[0]))
-
+    # bryostatin_smiles = "CCC/C=C/C=C/C(=O)O[C@H]1/C(=C/C(=O)OC)/C[C@H]2C[C@@H](OC(=O)[C@@H](CC[C@@H]3C[C@@H](C([C@@](O3)(C[C@@H]4C/C(=C/C(=O)OC)/C[C@@H](O4)/C=C/C([C@@]1(O2)O)(C)C)O)(C)C)OC(=O)C)O)[C@@H](C)O"
+    #
+    #
+    # def smiles_to_fp_vector(smiles, radius=2, useChirality=True):
+    #     """
+    #     Outputs morgan fingerprint array of dim 1 x 2048
+    #     """
+    #     m = AllChem.MolFromSmiles(smiles)
+    #     fp = AllChem.GetMorganFingerprintAsBitVect(m, radius=radius, useChirality=useChirality)
+    #     fp_vector = np.array(fp).reshape(1, -1)
+    #     return fp_vector
+    #
+    #
+    # print(smiles_to_fp_vector(bryostatin_smiles))
+    # print(len(smiles_to_fp_vector(bryostatin_smiles)[0]))
+    #
 
 
     # calc plogp for zinc
@@ -1700,6 +1721,9 @@ if __name__ == '__main__':
     #     reader = csv.reader(fp, delimiter=',', quotechar='"')
     #     data = [[float(row[0]),row[1]] for row in reader]
     # data_sorted = sorted(data,reverse=True)
+    # with open('zinc_plogp_sorted.csv', 'a') as f:
+    #     for row in data_sorted:
+    #         f.write(str(row[0]) + ',' + row[1] + '\n')
     # print(data_sorted[0:10])
     # print(len(data_sorted))
 
