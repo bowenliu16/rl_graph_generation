@@ -67,10 +67,10 @@ def load_scaffold():
 
 
 
-
+# todo: get relative path
 def load_conditional():
     import csv
-    with open('opt.test.logP-SA', 'r') as fp:
+    with open('/dfs/scratch0/jiaxuanyou0/git/rl_graph_generation/gym-molecule/gym_molecule/envs/opt.test.logP-SA', 'r') as fp:
         reader = csv.reader(fp, delimiter=' ', quotechar='"')
         data = [row+[id] for id,row in enumerate(reader)]
     # print(len(data))
