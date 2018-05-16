@@ -75,17 +75,18 @@ class MoleculeEnv(gym.Env):
     def __init__(self):
         pass
 
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False,max_action=128,min_action=20):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False,conditional=None,max_action=128,min_action=20):
         '''
         own init function, since gym does not support passing argument
         '''
         self.is_normalize = bool(is_normalize)
         self.is_conditional = is_conditional
+        self.conditional = conditional
         self.has_feature = has_feature
         self.reward_type = reward_type
         self.reward_target = reward_target
-        if self.is_conditional:
-            self.mol = Chem.RWMol(Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3'))
+        if self.is_conditional and (self.conditional is not None):
+            self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional))
             Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
@@ -364,7 +365,7 @@ class MoleculeEnv(gym.Env):
         :return: ob
         '''
         if self.is_conditional:
-            self.mol = Chem.RWMol(Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3'))
+            self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional))
             Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
@@ -1723,7 +1724,7 @@ if __name__ == '__main__':
 
 
     # print(reward_penalized_log_p(Chem.MolFromSmiles('CP(Br)P(I)(P(I)IP(I)II)(P(I)IP(I)(I)(I)II)P(I)IP(I)(I)(II)P(I)IP(I)(I)(I)II')))
-    # print(reward_penalized_log_p(Chem.MolFromSmiles('CN1CC[NH+](C)CCN(C)CC[NH+](C)CCN(C)CC[NH+](C)CC1')))
+    print(reward_penalized_log_p(Chem.MolFromSmiles('CS(=O)(NC1=CC=C(C=C1)C(N[C@@H](C([O-])=O)C(C)C)=O)=O')))
     # env.get_expert(4)
 
     # env.step(np.array([[0,3,0]]))

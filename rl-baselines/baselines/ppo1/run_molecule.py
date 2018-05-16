@@ -28,7 +28,7 @@ def train(args,seed,writer=None):
     set_global_seeds(workerseed)
     if args.env=='molecule':
         env = gym.make('molecule-v0')
-        env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,reward_type=args.reward_type,reward_target=args.reward_target,has_feature=bool(args.has_feature),is_conditional=bool(args.is_conditional),max_action=args.max_action,min_action=args.min_action) # remember call this after gym.make!!
+        env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,reward_type=args.reward_type,reward_target=args.reward_target,has_feature=bool(args.has_feature),is_conditional=bool(args.is_conditional),conditional=args.conditional,max_action=args.max_action,min_action=args.min_action) # remember call this after gym.make!!
     elif args.env=='graph':
         env = GraphEnv()
         env.init(reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,dataset=args.dataset) # remember call this after gym.make!!
@@ -114,6 +114,7 @@ def molecule_arg_parser():
     parser.add_argument('--gate_sum_d', type=int, default=0)
     parser.add_argument('--mask_null', type=int, default=0)
     parser.add_argument('--is_conditional', type=int, default=0) # default 0
+    parser.add_argument('--conditional', type=str, default='CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3') # default 0
     parser.add_argument('--max_action', type=int, default=128) # default 0
     parser.add_argument('--min_action', type=int, default=20) # default 0
     parser.add_argument('--bn', type=int, default=0)
