@@ -80,10 +80,11 @@ class MoleculeEnv(gym.Env):
         own init function, since gym does not support passing argument
         '''
         self.is_normalize = bool(is_normalize)
+        self.is_conditional = is_conditional
         self.has_feature = has_feature
         self.reward_type = reward_type
         self.reward_target = reward_target
-        if is_conditional:
+        if self.is_conditional:
             self.mol = Chem.RWMol(Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3'))
         else:
             self.mol = Chem.RWMol()
@@ -361,7 +362,10 @@ class MoleculeEnv(gym.Env):
         to avoid error, assume an atom already exists
         :return: ob
         '''
-        self.mol = Chem.RWMol()
+        if self.is_conditional:
+            self.mol = Chem.RWMol(Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3'))
+        else:
+            self.mol = Chem.RWMol()
         # self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
         self._add_atom(0) # always add carbon first
         self.smile_list= [self.get_final_smiles()]
