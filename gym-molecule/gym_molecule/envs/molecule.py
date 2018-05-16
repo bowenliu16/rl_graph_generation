@@ -75,7 +75,7 @@ class MoleculeEnv(gym.Env):
     def __init__(self):
         pass
 
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False):
         '''
         own init function, since gym does not support passing argument
         '''
@@ -83,7 +83,10 @@ class MoleculeEnv(gym.Env):
         self.has_feature = has_feature
         self.reward_type = reward_type
         self.reward_target = reward_target
-        self.mol = Chem.RWMol()
+        if is_conditional:
+            self.mol = Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3')
+        else:
+            self.mol = Chem.RWMol()
         self.smile_list = []
         if data_type=='gdb':
             possible_atoms = ['C', 'N', 'O', 'S', 'Cl'] # gdb 13
@@ -1619,12 +1622,30 @@ if __name__ == '__main__':
     m_env = MoleculeEnv()
     m_env.init(data_type='zinc',has_feature=True)
 
-    ob,ac = m_env.get_expert(batch_size=5)
-    # print(ob['adj'].shape,ob['node'].shape)
-    np.set_printoptions(precision=2,linewidth=200)
+    # calc plogp for zinc
+    # for mol in m_env.dataset:
+    #     plogp = reward_penalized_log_p(mol)
+    #     Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+    #     smile = Chem.MolToSmiles(mol, isomericSmiles=True)
+    #     with open('zinc_plogp.csv', 'a') as f:
+    #         f.write(str(plogp)+','+smile+'\n')
+    # sort plogp for zinc
+    import csv
+    with open('zinc_plogp.csv', 'r') as fp:
+        reader = csv.reader(fp, delimiter=',', quotechar='"')
+        data = [[float(row[0]),row[1]] for row in reader]
+    data_sorted = sorted(data,reverse=True)
+    print(data_sorted[0:10])
+    print(len(data_sorted))
 
-    for i in range(ob['node'].shape[2]):
-        print(ob['node'][0,0,i])
+
+
+    # ob,ac = m_env.get_expert(batch_size=5)
+    # print(ob['adj'].shape,ob['node'].shape)
+    # np.set_printoptions(precision=2,linewidth=200)
+    #
+    # for i in range(ob['node'].shape[2]):
+    #     print(ob['node'][0,0,i])
     # print('adj')
     # for i in range(ob['adj'].shape[2]):
     #     print(ob['adj'][0, 0, i])
@@ -1693,7 +1714,7 @@ if __name__ == '__main__':
 
 
     # print(reward_penalized_log_p(Chem.MolFromSmiles('CP(Br)P(I)(P(I)IP(I)II)(P(I)IP(I)(I)(I)II)P(I)IP(I)(I)(II)P(I)IP(I)(I)(I)II')))
-    print(reward_penalized_log_p(Chem.MolFromSmiles('C=CC(C(=CC)CCCC)=C(C)CC=CC')))
+    # print(reward_penalized_log_p(Chem.MolFromSmiles('CN1CC[NH+](C)CCN(C)CC[NH+](C)CCN(C)CC[NH+](C)CC1')))
     # env.get_expert(4)
 
     # env.step(np.array([[0,3,0]]))

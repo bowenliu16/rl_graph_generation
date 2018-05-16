@@ -28,7 +28,7 @@ def train(args,seed,writer=None):
     set_global_seeds(workerseed)
     if args.env=='molecule':
         env = gym.make('molecule-v0')
-        env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,reward_type=args.reward_type,reward_target=args.reward_target,has_feature=bool(args.has_feature)) # remember call this after gym.make!!
+        env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,reward_type=args.reward_type,reward_target=args.reward_target,has_feature=bool(args.has_feature),is_conditional=bool(args.is_conditional)) # remember call this after gym.make!!
     elif args.env=='graph':
         env = GraphEnv()
         env.init(reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,dataset=args.dataset) # remember call this after gym.make!!
@@ -70,12 +70,12 @@ def molecule_arg_parser():
                         default='molecule')
     parser.add_argument('--seed', help='RNG seed', type=int, default=666)
     parser.add_argument('--num_steps', type=int, default=int(5e7))
-    parser.add_argument('--name', type=str, default='test')
+    parser.add_argument('--name', type=str, default='test_conditional')
     parser.add_argument('--name_load', type=str, default='0new_concatno_mean_layer3_expert1500')
     # parser.add_argument('--name_load', type=str, default='test')
     parser.add_argument('--dataset', type=str, default='zinc',help='caveman; grid; ba; zinc; gdb')
     parser.add_argument('--dataset_load', type=str, default='zinc')
-    parser.add_argument('--reward_type', type=str, default='qed_target',help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
+    parser.add_argument('--reward_type', type=str, default='logppen',help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
     parser.add_argument('--reward_target', type=float, default=0.5,help='target reward value')
     parser.add_argument('--logp_ratio', type=float, default=1)
     parser.add_argument('--qed_ratio', type=float, default=1)
@@ -113,6 +113,7 @@ def molecule_arg_parser():
     parser.add_argument('--gan_type', type=str, default='normal')# normal, recommend, wgan
     parser.add_argument('--gate_sum_d', type=int, default=0)
     parser.add_argument('--mask_null', type=int, default=0)
+    parser.add_argument('--is_conditional', type=int, default=0) # default 0
     parser.add_argument('--bn', type=int, default=0)
     parser.add_argument('--name_full',type=str,default='')
     parser.add_argument('--name_full_load',type=str,default='')
