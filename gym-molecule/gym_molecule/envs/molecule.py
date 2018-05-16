@@ -75,7 +75,7 @@ class MoleculeEnv(gym.Env):
     def __init__(self):
         pass
 
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False,max_action=128,min_action=20):
         '''
         own init function, since gym does not support passing argument
         '''
@@ -124,8 +124,8 @@ class MoleculeEnv(gym.Env):
             self.max_atom = 13 + len(possible_atoms) # gdb 13
         elif data_type=='zinc':
             self.max_atom = 38 + len(possible_atoms) # ZINC
-        self.max_action = 128
-        self.min_action = 20
+        self.max_action = max_action
+        self.min_action = min_action
         self.logp_ratio = logp_ratio
         self.qed_ratio = qed_ratio
         self.sa_ratio = sa_ratio
