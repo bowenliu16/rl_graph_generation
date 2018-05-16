@@ -366,8 +366,8 @@ class MoleculeEnv(gym.Env):
             self.mol = Chem.RWMol(Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3'))
         else:
             self.mol = Chem.RWMol()
-        # self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
-        self._add_atom(0) # always add carbon first
+            # self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
+            self._add_atom(0) # always add carbon first
         self.smile_list= [self.get_final_smiles()]
         self.counter = 0
         ob = self.get_observation()
