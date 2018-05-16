@@ -143,7 +143,7 @@ class MoleculeEnv(gym.Env):
         if data_type=='gdb':
             self.max_atom = 13 + len(possible_atoms) # gdb 13
         elif data_type=='zinc':
-            self.max_atom = 38 + len(possible_atoms) + self.min_action # ZINC
+            self.max_atom = 38 + len(possible_atoms) # ZINC  + self.min_action
 
         self.logp_ratio = logp_ratio
         self.qed_ratio = qed_ratio
@@ -232,7 +232,7 @@ class MoleculeEnv(gym.Env):
 
         ### calculate terminal rewards
         # todo: add terminal action
-        if (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]-self.min_action or self.counter >= self.max_action or stop) and self.counter >= self.min_action:
+        if (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop) and self.counter >= self.min_action:
             # default reward
             reward_valid = 2
             reward_qed = 0
@@ -1662,6 +1662,30 @@ if __name__ == '__main__':
     print('debug')
     m_env = MoleculeEnv()
     m_env.init(data_type='zinc',has_feature=True,is_conditional=True)
+
+
+
+
+
+
+
+    bryostatin_smiles = "CCC/C=C/C=C/C(=O)O[C@H]1/C(=C/C(=O)OC)/C[C@H]2C[C@@H](OC(=O)[C@@H](CC[C@@H]3C[C@@H](C([C@@](O3)(C[C@@H]4C/C(=C/C(=O)OC)/C[C@@H](O4)/C=C/C([C@@]1(O2)O)(C)C)O)(C)C)OC(=O)C)O)[C@@H](C)O"
+
+
+    def smiles_to_fp_vector(smiles, radius=2, useChirality=True):
+        """
+        Outputs morgan fingerprint array of dim 1 x 2048
+        """
+        m = AllChem.MolFromSmiles(smiles)
+        fp = AllChem.GetMorganFingerprintAsBitVect(m, radius=radius, useChirality=useChirality)
+        fp_vector = np.array(fp).reshape(1, -1)
+        return fp_vector
+
+
+    print(smiles_to_fp_vector(bryostatin_smiles))
+    print(len(smiles_to_fp_vector(bryostatin_smiles)[0]))
+
+
 
     # calc plogp for zinc
     # for mol in m_env.dataset:

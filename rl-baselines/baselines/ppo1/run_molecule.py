@@ -113,7 +113,7 @@ def molecule_arg_parser():
     parser.add_argument('--gan_type', type=str, default='normal')# normal, recommend, wgan
     parser.add_argument('--gate_sum_d', type=int, default=0)
     parser.add_argument('--mask_null', type=int, default=0)
-    parser.add_argument('--is_conditional', type=int, default=1) # default 0
+    parser.add_argument('--is_conditional', type=int, default=0) # default 0
     parser.add_argument('--conditional', type=str, default='CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3') # default 0
     parser.add_argument('--max_action', type=int, default=128) # default 0
     parser.add_argument('--min_action', type=int, default=20) # default 0
