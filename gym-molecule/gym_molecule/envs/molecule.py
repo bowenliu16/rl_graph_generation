@@ -84,7 +84,7 @@ class MoleculeEnv(gym.Env):
         self.reward_type = reward_type
         self.reward_target = reward_target
         if is_conditional:
-            self.mol = Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3')
+            self.mol = Chem.RWMol(Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3'))
         else:
             self.mol = Chem.RWMol()
         self.smile_list = []
