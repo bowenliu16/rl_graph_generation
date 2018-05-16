@@ -365,6 +365,7 @@ class MoleculeEnv(gym.Env):
         '''
         if self.is_conditional:
             self.mol = Chem.RWMol(Chem.MolFromSmiles('CCCCCCC1=CC(=[O+]C(=C1)C2=CC=CC=C2)C3=CC=CC=C3'))
+            Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
             # self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
