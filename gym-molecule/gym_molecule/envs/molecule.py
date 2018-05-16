@@ -67,10 +67,12 @@ def load_scaffold():
 
 
 
-# todo: get relative path
 def load_conditional():
+    cwd = os.path.dirname(__file__)
+    path = os.path.join(os.path.dirname(cwd), 'dataset',
+                        'opt.test.logP-SA')
     import csv
-    with open('/dfs/scratch0/jiaxuanyou0/git/rl_graph_generation/gym-molecule/gym_molecule/envs/opt.test.logP-SA', 'r') as fp:
+    with open(path, 'r') as fp:
         reader = csv.reader(fp, delimiter=' ', quotechar='"')
         data = [row+[id] for id,row in enumerate(reader)]
     # print(len(data))
@@ -136,12 +138,13 @@ class MoleculeEnv(gym.Env):
         else:
             self.d_n = len(self.possible_atom_types)
 
+        self.max_action = max_action
+        self.min_action = min_action
         if data_type=='gdb':
             self.max_atom = 13 + len(possible_atoms) # gdb 13
         elif data_type=='zinc':
-            self.max_atom = 38 + len(possible_atoms) # ZINC
-        self.max_action = max_action
-        self.min_action = min_action
+            self.max_atom = 38 + len(possible_atoms) + self.min_action # ZINC
+
         self.logp_ratio = logp_ratio
         self.qed_ratio = qed_ratio
         self.sa_ratio = sa_ratio
@@ -229,7 +232,7 @@ class MoleculeEnv(gym.Env):
 
         ### calculate terminal rewards
         # todo: add terminal action
-        if (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop) and self.counter >= self.min_action:
+        if (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]-self.min_action or self.counter >= self.max_action or stop) and self.counter >= self.min_action:
             # default reward
             reward_valid = 2
             reward_qed = 0
@@ -623,6 +626,7 @@ class MoleculeEnv(gym.Env):
         temp = np.eye(n_shift)
         auxiliary_atom_features[:temp.shape[0], :temp.shape[1]] = temp
         F[0,n:n+n_shift,:] = auxiliary_atom_features
+        # print('n',n,'n+n_shift',n+n_shift,auxiliary_atom_features.shape)
 
         d_e = len(self.possible_bond_types)
         E = np.zeros((d_e, self.max_atom, self.max_atom))
@@ -1637,6 +1641,16 @@ def reward_penalized_log_p(mol):
 #     return np.mean(SA_scores), np.std(SA_scores), np.mean(
 #         logP_values), np.std(logP_values), np.mean(
 #         cycle_scores), np.std(cycle_scores)
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
