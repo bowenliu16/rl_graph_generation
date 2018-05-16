@@ -68,6 +68,16 @@ def load_scaffold():
 
 
 
+def load_conditional():
+    import csv
+    with open('opt.test.logP-SA', 'r') as fp:
+        reader = csv.reader(fp, delimiter=' ', quotechar='"')
+        data = [row+[id] for id,row in enumerate(reader)]
+    # print(len(data))
+    # print(data[799])
+    return data
+
+
 class MoleculeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     # todo: seed()
@@ -81,12 +91,15 @@ class MoleculeEnv(gym.Env):
         '''
         self.is_normalize = bool(is_normalize)
         self.is_conditional = is_conditional
-        self.conditional = conditional
+        # self.conditional = conditional
         self.has_feature = has_feature
         self.reward_type = reward_type
         self.reward_target = reward_target
-        if self.is_conditional and (self.conditional is not None):
-            self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional))
+
+        self.conditional_list = load_conditional()
+        if self.is_conditional:
+            self.conditional = random.sample(self.conditional_list,1)[0]
+            self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional[0]))
             Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
@@ -291,7 +304,7 @@ class MoleculeEnv(gym.Env):
             reward = reward_step + reward_valid + reward_final
             # reward = reward_step + reward_valid + reward_qed*2
             info['smile'] = self.get_final_smiles()
-            info['reward_valid'] = reward_valid
+            info['reward_valid'] = self.conditional[-1] ### temp change
             info['reward_qed'] = reward_qed
             info['reward_sa'] = reward_sa
             info['final_stat'] = reward_final
@@ -365,7 +378,8 @@ class MoleculeEnv(gym.Env):
         :return: ob
         '''
         if self.is_conditional:
-            self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional))
+            self.conditional = random.sample(self.conditional_list, 1)[0]
+            self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional[0]))
             Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
@@ -1630,7 +1644,7 @@ if __name__ == '__main__':
     ## debug
     print('debug')
     m_env = MoleculeEnv()
-    m_env.init(data_type='zinc',has_feature=True)
+    m_env.init(data_type='zinc',has_feature=True,is_conditional=True)
 
     # calc plogp for zinc
     # for mol in m_env.dataset:
@@ -1640,13 +1654,13 @@ if __name__ == '__main__':
     #     with open('zinc_plogp.csv', 'a') as f:
     #         f.write(str(plogp)+','+smile+'\n')
     # sort plogp for zinc
-    import csv
-    with open('zinc_plogp.csv', 'r') as fp:
-        reader = csv.reader(fp, delimiter=',', quotechar='"')
-        data = [[float(row[0]),row[1]] for row in reader]
-    data_sorted = sorted(data,reverse=True)
-    print(data_sorted[0:10])
-    print(len(data_sorted))
+    # import csv
+    # with open('zinc_plogp.csv', 'r') as fp:
+    #     reader = csv.reader(fp, delimiter=',', quotechar='"')
+    #     data = [[float(row[0]),row[1]] for row in reader]
+    # data_sorted = sorted(data,reverse=True)
+    # print(data_sorted[0:10])
+    # print(len(data_sorted))
 
 
 
@@ -1724,7 +1738,7 @@ if __name__ == '__main__':
 
 
     # print(reward_penalized_log_p(Chem.MolFromSmiles('CP(Br)P(I)(P(I)IP(I)II)(P(I)IP(I)(I)(I)II)P(I)IP(I)(I)(II)P(I)IP(I)(I)(I)II')))
-    print(reward_penalized_log_p(Chem.MolFromSmiles('CS(=O)(NC1=CC=C(C=C1)C(N[C@@H](C([O-])=O)C(C)C)=O)=O')))
+    # print(reward_penalized_log_p(Chem.MolFromSmiles('CS(=O)(NC1=CC=C(C=C1)C(N[C@@H](C([O-])=O)C(C)C)=O)=O')))
     # env.get_expert(4)
 
     # env.step(np.array([[0,3,0]]))
