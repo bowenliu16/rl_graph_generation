@@ -264,8 +264,6 @@ class MoleculeEnv(gym.Env):
             else:
                 # final mol object where any radical electrons are changed to bonds to hydrogen
                 final_mol = self.get_final_mol()
-                s = Chem.MolToSmiles(final_mol, isomericSmiles=True)
-                final_mol = Chem.MolFromSmiles(s)
 
                 # mol filters with negative rewards
                 if not steric_strain_filter(final_mol):  # passes 3D conversion, no excessive strain
@@ -436,8 +434,7 @@ class MoleculeEnv(gym.Env):
         not modified. Radicals pass this test.
         :return: True if chemically valid, False otherwise
         """
-        s = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-        m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
+        m = sanitize_mol(self.mol)
         if m:
             return True
         else:
@@ -456,7 +453,6 @@ class MoleculeEnv(gym.Env):
         except ValueError:
             return False
 
-    # TODO(Bowen): check if need to sanitize again
     def get_final_smiles(self):
         """
         Returns a SMILES of the final molecule. Converts any radical
@@ -464,9 +460,9 @@ class MoleculeEnv(gym.Env):
         :return: SMILES
         """
         m = convert_radical_electrons_to_hydrogens(self.mol)
+        m = sanitize_mol(m)
         return Chem.MolToSmiles(m, isomericSmiles=True)
 
-    # TODO(Bowen): check if need to sanitize again
     def get_final_mol(self):
         """
         Returns a rdkit mol object of the final molecule. Converts any radical
@@ -474,6 +470,7 @@ class MoleculeEnv(gym.Env):
         :return: SMILES
         """
         m = convert_radical_electrons_to_hydrogens(self.mol)
+        m = sanitize_mol(m)
         return m
 
 
