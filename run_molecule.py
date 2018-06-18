@@ -2,11 +2,7 @@
 
 from mpi4py import MPI
 from baselines.common import set_global_seeds
-# from baselines import bench
-# import os.path as osp
 from baselines import logger
-# from baselines.common.atari_wrappers import make_atari, wrap_deepmind
-# from baselines.common.cmd_util import atari_arg_parser
 from tensorboardX import SummaryWriter
 import os
 import tensorflow as tf
@@ -33,15 +29,9 @@ def train(args,seed,writer=None):
         env = GraphEnv()
         env.init(reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,dataset=args.dataset) # remember call this after gym.make!!
     print(env.observation_space)
-    def policy_fn(name, ob_space, ac_space): #pylint: disable=W0613
-        # return cnn_policy.CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
+    def policy_fn(name, ob_space, ac_space):
         return gcn_policy.GCNPolicy(name=name, ob_space=ob_space, ac_space=ac_space, atom_type_num=env.atom_type_num,args=args)
-    # env = bench.Monitor(env, logger.get_dir() and
-    #     osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)
-
-    # env = wrap_deepmind(env)
-    # env.seed(workerseed)
 
     pposgd_simple_gcn.learn(args,env, policy_fn,
         max_timesteps=args.num_steps,
@@ -62,9 +52,6 @@ def arg_parser():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 def molecule_arg_parser():
-    """
-    Create an argparse.ArgumentParser for run_atari.py.
-    """
     parser = arg_parser()
     parser.add_argument('--env', type=str, help='environment name: molecule; graph',
                         default='molecule')
@@ -121,11 +108,6 @@ def molecule_arg_parser():
     parser.add_argument('--name_full',type=str,default='')
     parser.add_argument('--name_full_load',type=str,default='')
 
-
-
-
-
-
     return parser
 
 def main():
@@ -138,22 +120,13 @@ def main():
         os.makedirs('molecule_gen')
     if not os.path.exists('ckpt'):
         os.makedirs('ckpt')
-    # # new
-    # with open('molecule_gen/' + args.name + '.csv', 'a') as f:
-    #     f.write('{},{},{},{},{},{},{},{}\n'.format('smile', 'reward_qed', 'reward_logp','reward_sa', 'reward_sum', 'qed_ratio',
-    #                                                'logp_ratio', 'sa_ratio'))
 
     # only keep first worker result in tensorboard
     if MPI.COMM_WORLD.Get_rank() == 0:
         writer = SummaryWriter(comment='_'+args.dataset+'_'+args.name)
     else:
         writer = None
-    # try:
     train(args,seed=args.seed,writer=writer)
-    # except:
-    #     writer.export_scalars_to_json("./all_scalars.json")
-    #     writer.close()
-    #     pass
 
 if __name__ == '__main__':
     main()

@@ -451,12 +451,7 @@ def learn(args,env, policy_fn, *,
     var_list_pi_stop = [var for var in var_list_pi if ('emb' in var.name) or ('gcn' in var.name) or ('stop' in var.name)]
     var_list_d_step = [var for var in tf.global_variables() if 'd_step' in var.name]
     var_list_d_final = [var for var in tf.global_variables() if 'd_final' in var.name]
-    # for var in var_list_pi:
-    #     print('var_list_pi',var)
-    # for var in var_list_pi_stop:
-    #     print('var_list_pi_stop', var)
-    # for var in var_list_d:
-    #     print('var_list_d', var)
+
     ## debug
     debug={}
     # debug['ac'] = ac
@@ -573,8 +568,6 @@ def learn(args,env, policy_fn, *,
         # logger.log("********** Iteration %i ************"%iters_so_far)
 
 
-        ## when PPO start, prepare PPO training data
-        # if iters_so_far >= args.rl_start and iters_so_far <= args.rl_end:
 
         seg = seg_gen.__next__()
         add_vtarg_and_adv(seg, gamma, lam)
@@ -671,15 +664,6 @@ def learn(args,env, policy_fn, *,
         meanlosses,_,_ = mpi_moments(losses, axis=0)
         # logger.log(fmt_row(13, meanlosses))
 
-        # logger.record_tabular("loss_expert", loss_expert)
-        # logger.record_tabular('grad_expert_min',np.amin(g_expert))
-        # logger.record_tabular('grad_expert_max',np.amax(g_expert))
-        # logger.record_tabular('grad_expert_norm', np.linalg.norm(g_expert))
-        # logger.record_tabular('grad_rl_min', np.amin(g))
-        # logger.record_tabular('grad_rl_max', np.amax(g))
-        # logger.record_tabular('grad_rl_norm', np.linalg.norm(g))
-        # logger.record_tabular('learning_rate', optim_stepsize * cur_lrmult)
-
         if writer is not None:
             writer.add_scalar("loss_expert", loss_expert, iters_so_far)
             writer.add_scalar("loss_expert_stop", loss_expert_stop, iters_so_far)
@@ -763,27 +747,8 @@ def learn(args,env, policy_fn, *,
         if counter%args.curriculum_step and counter//args.curriculum_step<args.curriculum_num:
             level += 1
 
-
-
-                # if MPI.COMM_WORLD.Get_rank()==0:
-        #     logger.dump_tabular()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def flatten_lists(listoflists):
+    return [el for list_ in listoflists for el in list_]
 
 
 # # scaffold
@@ -1200,5 +1165,3 @@ def learn(args,env, policy_fn, *,
 
 
 
-def flatten_lists(listoflists):
-    return [el for list_ in listoflists for el in list_]

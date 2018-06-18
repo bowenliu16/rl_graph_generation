@@ -63,7 +63,7 @@ def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, 
             node_embedding = tf.nn.l2_normalize(node_embedding,axis=-1)
         return node_embedding
 
-# # gcn mean aggregation over edge features
+# # gcn mean aggregation over edge features, multi hop version
 # def GCN_multihop_batch(adj, node_feature, out_channels, hops, is_act=True, is_normalize=False, name='gcn_simple',aggregate='mean'):
 #     '''
 #     state s: (adj,node_feature)
@@ -325,14 +325,6 @@ class GCNPolicy(object):
 
         self.ac = tf.concat((tf.expand_dims(ac_first,axis=1),tf.expand_dims(ac_second,axis=1),tf.expand_dims(ac_edge,axis=1),tf.expand_dims(ac_stop,axis=1)),axis=1)
 
-        # print('ob_adj', ob['adj'].get_shape(),
-        #       'ob_node', ob['node'].get_shape())
-        # print('logits_first', self.logits_first.get_shape(),
-        #       'logits_second', self.logits_second.get_shape(),
-        #       'logits_edge', self.logits_edge.get_shape())
-        # print('ac_edge', ac_edge.get_shape())
-        # for var in tf.trainable_variables():
-        #     print('variable', var)
 
         debug = {}
         debug['ob_node'] = tf.shape(ob['node'])
@@ -394,6 +386,51 @@ def GCN_emb(ob,args):
         emb_graph = tf.tile(emb_graph, [1, tf.shape(emb_node)[1], 1])
         emb_node = tf.concat([emb_node, emb_graph], axis=2)
     return emb_node
+
+
+#### debug
+
+if __name__ == "__main__":
+    adj_np = np.ones((5,3,4,4))
+    adj = tf.placeholder(shape=(5,3,4,4),dtype=tf.float32)
+    node_feature_np = np.ones((5,1,4,3))
+    node_feature = tf.placeholder(shape=(5,1,4,3),dtype=tf.float32)
+
+
+    ob_space = {}
+    atom_type = 5
+    ob_space['adj'] = gym.Space(shape=[3,5,5])
+    ob_space['node'] = gym.Space(shape=[1,5,atom_type])
+    ac_space = gym.spaces.MultiDiscrete([10, 10, 3])
+    policy = GCNPolicy(name='policy',ob_space=ob_space,ac_space=ac_space)
+
+    stochastic = True
+    env = gym.make('molecule-v0')  # in gym format
+    env.init()
+    ob = env.reset()
+
+    # ob['adj'] = np.repeat(ob['adj'][None],2,axis=0)
+    # ob['node'] = np.repeat(ob['node'][None],2,axis=0)
+
+    print('adj',ob['adj'].shape)
+    print('node',ob['node'].shape)
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        for i in range(20):
+            ob = env.reset()
+            for j in range(0,20):
+                ac,vpred,debug = policy.act(stochastic,ob)
+                # if ac[0]==ac[1]:
+                #     print('error')
+                # else:
+                # print('i',i,'ac',ac,'vpred',vpred,'debug',debug['logits_first'].shape,debug['logits_second'].shape)
+                print('i', i)
+                # print('ac\n',ac)
+                # print('debug\n',debug['ob_len'])
+                ob,reward,_,_ = env.step(ac)
+
+
+
 
 
 
@@ -586,51 +623,3 @@ def GCN_emb(ob,args):
 #
 #
 #
-
-
-
-
-
-
-
-
-if __name__ == "__main__":
-    adj_np = np.ones((5,3,4,4))
-    adj = tf.placeholder(shape=(5,3,4,4),dtype=tf.float32)
-    node_feature_np = np.ones((5,1,4,3))
-    node_feature = tf.placeholder(shape=(5,1,4,3),dtype=tf.float32)
-
-
-    ob_space = {}
-    atom_type = 5
-    ob_space['adj'] = gym.Space(shape=[3,5,5])
-    ob_space['node'] = gym.Space(shape=[1,5,atom_type])
-    ac_space = gym.spaces.MultiDiscrete([10, 10, 3])
-    policy = GCNPolicy(name='policy',ob_space=ob_space,ac_space=ac_space)
-
-    stochastic = True
-    env = gym.make('molecule-v0')  # in gym format
-    env.init()
-    ob = env.reset()
-
-    # ob['adj'] = np.repeat(ob['adj'][None],2,axis=0)
-    # ob['node'] = np.repeat(ob['node'][None],2,axis=0)
-
-    print('adj',ob['adj'].shape)
-    print('node',ob['node'].shape)
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        for i in range(20):
-            ob = env.reset()
-            for j in range(0,20):
-                ac,vpred,debug = policy.act(stochastic,ob)
-                # if ac[0]==ac[1]:
-                #     print('error')
-                # else:
-                # print('i',i,'ac',ac,'vpred',vpred,'debug',debug['logits_first'].shape,debug['logits_second'].shape)
-                print('i', i)
-                # print('ac\n',ac)
-                # print('debug\n',debug['ob_len'])
-                ob,reward,_,_ = env.step(ac)
-
-
