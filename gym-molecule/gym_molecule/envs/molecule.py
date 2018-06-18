@@ -1372,101 +1372,7 @@ def steric_strain_filter(mol, cutoff=0.82,
     else:
         return False
 
-# # old one, don't use this for now
-# def steric_strain_filter(mol, forcefield='uff', cutoff=320,
-#                          max_attempts_embed=20,
-#                          max_num_iters=200):
-#     """
-#     Flags molecules based on a steric energy cutoff after max_num_iters
-#     iterations of forcefield minimization. Cutoff is based on steric energy
-#     per heavy atom
-#     :param mol: rdkit mol object
-#     :param forcefield: forcefield type. either uff or mmff94
-#     :param cutoff: kcal/mol per heavy atom . If minimized energy is above this
-#     threshold, then molecule fails the steric strain filter
-#     :param max_attempts_embed: number of attempts to generate initial 3d
-#     coordinates
-#     :param max_num_iters: number of iterations of forcefield minimization
-#     :return: True if molecule could be successfully minimized, and resulting
-#     energy is below cutoff, otherwise False
-#     """
-#     # make copy of input mol and add hydrogens
-#     m = copy.deepcopy(mol)
-#     Chem.SanitizeMol(m) # TODO(Bowen): check if this is even necessary?
-#     m_h = Chem.AddHs(m)
-#
-#     # generate an initial 3d conformer
-#     flag = AllChem.EmbedMolecule(m_h, maxAttempts=max_attempts_embed)
-#     if flag == -1:
-#         print("Unable to generate 3d conformer")
-#         return False
-#
-#     # set up the forcefield
-#     if forcefield == 'mmff94':
-#         AllChem.MMFFSanitizeMolecule(m_h)
-#         if AllChem.MMFFHasAllMoleculeParams(m_h):
-#             mmff_props = AllChem.MMFFGetMoleculeProperties(m_h)
-#             ff = AllChem.MMFFGetMoleculeForceField(m_h, mmff_props)
-#         else:
-#             print("Unrecognized atom type")
-#             return False
-#     elif forcefield == 'uff':
-#         if AllChem.UFFHasAllMoleculeParams(m_h):
-#             ff = AllChem.UFFGetMoleculeForceField(m_h)
-#         else:
-#             print("Unrecognized atom type")
-#             return False
-#     else:
-#         return ValueError("Invalid forcefield type")
-#
-#     # minimize steric energy
-#     try:
-#         ff.Minimize(maxIts=max_num_iters)
-#     except:
-#         print("Minimization error")
-#         return False
-#
-#     min_e = ff.CalcEnergy()
-#     print("Minimized energy: {}".format(min_e))
-#     print("Minimized energy per heavy atom: {}".format(min_e / m.GetNumAtoms()))
-#
-#     if min_e < cutoff:
-#         return True
-#     else:
-#         return False
 
-# # TEST steric_strain_filter
-# # known 'stable' molecules
-# s_smiles = ['CCC/C=C/C=C/C(=O)O[C@H]1/C(=C/C(=O)OC)/C[C@H]2C[C@@H](OC(=O)['
-#             'C@@H](CC[C@@H]3C[C@@H](C([C@@](O3)(C[C@@H]4C/C(=C/C(=O)OC)/C[C@@H](O4)/C=C/C([C@@]1(O2)O)(C)C)O)(C)C)OC(=O)C)O)[C@@H](C)O',
-#             'O=S1(C2=CC=CC=C2NC3=C1C(C4=CC=CC=C4)=NO3)=O',
-#             'Cl/C(C1=CC=CC=C1)=N/O',
-#             'FC1=CC=CC=C1S(CC#N)=O',
-#             'COC([C@@H]([C@H](c(c[nH]1)c2c1cccc2)C)NC(C3CCN(CC3)C('
-#             'c4ccccc4)=O)=O)=O',
-#             'Cc1c(C(O)=O)sc(N2CCN(C2=O)Cc3ccc(OC(F)(F)F)cc3)n1',
-#             'C[C@H](c1cc(C(F)(F)F)cc(C(F)(F)F)c1)O[C@H]2CCN(C['
-#             'C@H]2c3ccccc3)C([C@H]4CC[C@@H](CC4)C(O)=O)=O',
-#             'O=C1CCC(N1Br)=O',
-#             'C1CC2CCC1C2',
-#             'C1#CCCCCCC1',
-#             'C1CCCCC/C=C/1',
-#             'C1(C2)CCC2C=C1',
-#             'C1CC2CCC=C(C1)C2',
-#             'C12C3C4C1C5C2C3C45']
-# for s in s_smiles:
-#     m = Chem.MolFromSmiles(s)
-#     assert steric_strain_filter(m) == True
-# # known 'unstable' molecules
-# u_smiles = ['C1#CC1',
-#             'C1#CCC1',
-#             'C1#CCCC1',
-#             'C1#CCCCCC1',
-#             'C1(C2)=CCC2CC1',
-#             'C1(CC2)=CC2CC1']
-# for u in u_smiles:
-#     m = Chem.MolFromSmiles(u)
-#     assert steric_strain_filter(m) == False
 
 ### TARGET VALUE REWARDS ###
 
@@ -1474,9 +1380,6 @@ def reward_target(mol, target, ratio, val_max, val_min, func):
     x = func(mol)
     reward = max(-1*np.abs((x-target)/ratio) + val_max,val_min)
     return reward
-
-# def f(x,r_max1=4,r_max2=2.25,r_mid=2,r_min=-2,x_start=150, x_mid=175):
-#     return max((r_max1-r_mid)/(x_start-x_mid)*np.abs(x-x_mid)+r_max1, (r_max2-r_mid)/(x_start-x_mid)*np.abs(x-x_mid)+r_max2,r_min)
 
 def reward_target_new(mol, func,r_max1=4,r_max2=2.25,r_mid=2,r_min=-2,x_start=500, x_mid=525):
     x = func(mol)
@@ -1612,60 +1515,56 @@ def reward_penalized_log_p(mol):
 # assert round(reward_penalized_log_p(Chem.MolFromSmiles('ClC(C('
 #                                                        'Cl)=C1)=CC=C1NC2=CC=CC=C2C(NC(NC3=C(C(NC4=C(Cl)C=CC=C4)=S)C=CC=C3)=O)=O')), 2) == 4.93
 
-# def get_normalized_values():
-#     fname = '/home/bowen/pycharm_deployment_directory/rl_graph_generation/gym-molecule/gym_molecule/dataset/250k_rndm_zinc_drugs_clean.smi'
-#     with open(fname) as f:
-#         smiles = f.readlines()
-#
-#     for i in range(len(smiles)):
-#         smiles[i] = smiles[i].strip()
-#     smiles_rdkit = []
-#
-#     for i in range(len(smiles)):
-#         smiles_rdkit.append(Chem.MolToSmiles(Chem.MolFromSmiles(smiles[i])))
-#     print(i)
-#
-#     logP_values = []
-#     for i in range(len(smiles)):
-#         logP_values.append(MolLogP(Chem.MolFromSmiles(smiles_rdkit[i])))
-#     print(i)
-#
-#     SA_scores = []
-#     for i in range(len(smiles)):
-#         SA_scores.append(
-#             -calculateScore(Chem.MolFromSmiles(smiles_rdkit[i])))
-#     print(i)
-#
-#     cycle_scores = []
-#     for i in range(len(smiles)):
-#         cycle_list = nx.cycle_basis(nx.Graph(
-#             Chem.rdmolops.GetAdjacencyMatrix(Chem.MolFromSmiles(smiles_rdkit[
-#                                                                   i]))))
-#         if len(cycle_list) == 0:
-#             cycle_length = 0
-#         else:
-#             cycle_length = max([len(j) for j in cycle_list])
-#         if cycle_length <= 6:
-#             cycle_length = 0
-#         else:
-#             cycle_length = cycle_length - 6
-#         cycle_scores.append(-cycle_length)
-#     print(i)
-#
-#     SA_scores_normalized = (np.array(SA_scores) - np.mean(SA_scores)) / np.std(
-#         SA_scores)
-#     logP_values_normalized = (np.array(logP_values) - np.mean(
-#         logP_values)) / np.std(logP_values)
-#     cycle_scores_normalized = (np.array(cycle_scores) - np.mean(
-#         cycle_scores)) / np.std(cycle_scores)
-#
-#     return np.mean(SA_scores), np.std(SA_scores), np.mean(
-#         logP_values), np.std(logP_values), np.mean(
-#         cycle_scores), np.std(cycle_scores)
+def get_normalized_values():
+    fname = '/home/bowen/pycharm_deployment_directory/rl_graph_generation/gym-molecule/gym_molecule/dataset/250k_rndm_zinc_drugs_clean.smi'
+    with open(fname) as f:
+        smiles = f.readlines()
 
+    for i in range(len(smiles)):
+        smiles[i] = smiles[i].strip()
+    smiles_rdkit = []
 
+    for i in range(len(smiles)):
+        smiles_rdkit.append(Chem.MolToSmiles(Chem.MolFromSmiles(smiles[i])))
+    print(i)
 
+    logP_values = []
+    for i in range(len(smiles)):
+        logP_values.append(MolLogP(Chem.MolFromSmiles(smiles_rdkit[i])))
+    print(i)
 
+    SA_scores = []
+    for i in range(len(smiles)):
+        SA_scores.append(
+            -calculateScore(Chem.MolFromSmiles(smiles_rdkit[i])))
+    print(i)
+
+    cycle_scores = []
+    for i in range(len(smiles)):
+        cycle_list = nx.cycle_basis(nx.Graph(
+            Chem.rdmolops.GetAdjacencyMatrix(Chem.MolFromSmiles(smiles_rdkit[
+                                                                  i]))))
+        if len(cycle_list) == 0:
+            cycle_length = 0
+        else:
+            cycle_length = max([len(j) for j in cycle_list])
+        if cycle_length <= 6:
+            cycle_length = 0
+        else:
+            cycle_length = cycle_length - 6
+        cycle_scores.append(-cycle_length)
+    print(i)
+
+    SA_scores_normalized = (np.array(SA_scores) - np.mean(SA_scores)) / np.std(
+        SA_scores)
+    logP_values_normalized = (np.array(logP_values) - np.mean(
+        logP_values)) / np.std(logP_values)
+    cycle_scores_normalized = (np.array(cycle_scores) - np.mean(
+        cycle_scores)) / np.std(cycle_scores)
+
+    return np.mean(SA_scores), np.std(SA_scores), np.mean(
+        logP_values), np.std(logP_values), np.mean(
+        cycle_scores), np.std(cycle_scores)
 
 
 
@@ -1680,193 +1579,8 @@ if __name__ == '__main__':
     # env.init(has_scaffold=True)
 
     ## debug
-    print('debug')
     m_env = MoleculeEnv()
     m_env.init(data_type='zinc',has_feature=True,is_conditional=True)
-
-
-
-
-
-
-
-    # bryostatin_smiles = "CCC/C=C/C=C/C(=O)O[C@H]1/C(=C/C(=O)OC)/C[C@H]2C[C@@H](OC(=O)[C@@H](CC[C@@H]3C[C@@H](C([C@@](O3)(C[C@@H]4C/C(=C/C(=O)OC)/C[C@@H](O4)/C=C/C([C@@]1(O2)O)(C)C)O)(C)C)OC(=O)C)O)[C@@H](C)O"
-    #
-    #
-    # def smiles_to_fp_vector(smiles, radius=2, useChirality=True):
-    #     """
-    #     Outputs morgan fingerprint array of dim 1 x 2048
-    #     """
-    #     m = AllChem.MolFromSmiles(smiles)
-    #     fp = AllChem.GetMorganFingerprintAsBitVect(m, radius=radius, useChirality=useChirality)
-    #     fp_vector = np.array(fp).reshape(1, -1)
-    #     return fp_vector
-    #
-    #
-    # print(smiles_to_fp_vector(bryostatin_smiles))
-    # print(len(smiles_to_fp_vector(bryostatin_smiles)[0]))
-    #
-
-
-    # calc plogp for zinc
-    # for mol in m_env.dataset:
-    #     plogp = reward_penalized_log_p(mol)
-    #     Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
-    #     smile = Chem.MolToSmiles(mol, isomericSmiles=True)
-    #     with open('zinc_plogp.csv', 'a') as f:
-    #         f.write(str(plogp)+','+smile+'\n')
-    # sort plogp for zinc
-    # import csv
-    # with open('zinc_plogp.csv', 'r') as fp:
-    #     reader = csv.reader(fp, delimiter=',', quotechar='"')
-    #     data = [[float(row[0]),row[1]] for row in reader]
-    # data_sorted = sorted(data,reverse=True)
-    # with open('zinc_plogp_sorted.csv', 'a') as f:
-    #     for row in data_sorted:
-    #         f.write(str(row[0]) + ',' + row[1] + '\n')
-    # print(data_sorted[0:10])
-    # print(len(data_sorted))
-
-
-
-    # ob,ac = m_env.get_expert(batch_size=5)
-    # print(ob['adj'].shape,ob['node'].shape)
-    # np.set_printoptions(precision=2,linewidth=200)
-    #
-    # for i in range(ob['node'].shape[2]):
-    #     print(ob['node'][0,0,i])
-    # print('adj')
-    # for i in range(ob['adj'].shape[2]):
-    #     print(ob['adj'][0, 0, i])
-    # add test mol
-    # rw_mol = Chem.RWMol(Chem.MolFromSmiles('c1ccc(cc1)O'))
-    # Chem.SanitizeMol(rw_mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
-    # m_env.mol = rw_mol
-    # print(m_env.get_final_smiles())
-    # np.set_printoptions(threshold=np.nan)
-    # print(m_env.get_observation()['node'])
-    # print(m_env.get_observation()['node'].shape) # dim d_e x n x n
-    # print(m_env.get_observation()['adj'])
-    # print(m_env.get_observation()['adj'].shape) # dim 1 x n x d_n
-
-
-    ## end debug
-
-
-    # ob = env.reset()
-    # print(ob['adj'])
-    # print(ob['node'])
-    # ob,rew,new,info = env.step(np.array([[2,2,0,0]]))
-    # print(ob['adj'])
-    # print(ob['node'])
-    # print(rew)
-    # print(new)
-    # print(info)
-
-    # ob,ac = env.get_expert(5)
-
-    # ob = env.get_observation_scaffold()
-    # print(ob['adj'].shape)
-    # print(ob['node'].shape)
-    # for i in range(10):
-    #     print(ob['adj'][i])
-    #     print(ob['node'][i])
-
-    # print('ob',ob)
-
-
-    # print(ob['adj'].shape)
-    # print(ob['node'].shape)
-    #
-    # ob,ac = env.get_expert(5)
-    # np.set_printoptions(precision=2,linewidth=200)
-    # for j in range(10):
-    #     print('-------------------------------')
-    #     for i in range(ob['adj'].shape[-1]):
-    #         print(ob['adj'][j,0][i])
-
-
-    # print('node')
-    # for i in range(ob['node'].shape[2]):
-    #     print(ob['node'][0,0,i])
-    # print('adj')
-    # for i in range(ob['adj'].shape[2]):
-    #     print(ob['adj'][0, 0, i])
-    # print(ac)
-
-    # atom_list = []
-    # bond_list = []
-    # for i in range(100):
-    #     atom_list.append(env.dataset[i].GetNumAtoms())
-    #     bond_list.append(env.dataset[i].GetNumBonds())
-    # print(max(atom_list),max(bond_list))
-
-
-    # print(reward_penalized_log_p(Chem.MolFromSmiles('CP(Br)P(I)(P(I)IP(I)II)(P(I)IP(I)(I)(I)II)P(I)IP(I)(I)(II)P(I)IP(I)(I)(I)II')))
-    # print(reward_penalized_log_p(Chem.MolFromSmiles('CS(=O)(NC1=CC=C(C=C1)C(N[C@@H](C([O-])=O)C(C)C)=O)=O')))
-    # env.get_expert(4)
-
-    # env.step(np.array([[0,3,0]]))
-    # env.step(np.array([[1,4,0]]))
-    # env.step(np.array([[0,4,0]]))
-    # env.step(np.array([[0,4,0]]))
-    #
-    # s = Chem.MolToSmiles(env.mol, isomericSmiles=True)
-    # m = Chem.MolFromSmiles(s)  # implicitly performs sanitization
-    #
-    # ring = m.GetRingInfo()
-    # print('ring',ring.NumAtomRings(0))
-    # s = calculateScore(m)
-    # print(s)
-
-    # ac = np.array([[0,3,0]])
-    # print(ac.shape)
-    # ob,reward,done,info = env.step([[0,3,0]])
-    # ob, reward, done, info = env.step([[0, 4, 0]])
-    # print('after add node')
-    # print(ob['adj'])
-    # print(ob['node'])
-    # print(reward)
-
-
-    # # add carbon
-    # env.step(np.array([1, 0, 0]), 'add_atom')
-    # # add carbon
-    # env.step(np.array([1, 0, 0]), 'add_atom')
-    # # add double bond between carbon 1 and carbon 2
-    # env.step(np.array([[0, 1, 0]]), 'modify_bond')
-    # # add carbon
-    # env.step(np.array([1, 0, 0]), 'add_atom')
-    # # add single bond between carbon 2 and carbon 3
-    # env.step(np.array([[0, 0, 0], [1, 0, 0]]), 'modify_bond')
-    # # add oxygen
-    # env.step(np.array([0, 0, 1]), 'add_atom')
-    #
-    # # add single bond between carbon 3 and oxygen
-    # env.step(np.array([[0, 0, 0], [0, 0, 0], [1, 0, 0]]), 'modify_bond')
-
-    # A,E,F = env.get_matrices()
-    # print('A',A.shape)
-    # print('E',E.shape)
-    # print('F',F.shape)
-    # print('A\n',A)
-    # print('E\n', np.sum(E,axis=2))
-
-    # print(env.check_valency())
-    # print(env.check_chemical_validity())
-
-    # # test get ob
-    # ob = env.get_observation()
-    # print(ob['adj'].shape,ob['node'].shape)
-    # for i in range(3):
-    #     print(ob['adj'][i])
-    # print(ob['node'])
-
-
-
-
-
-
 
 
 
