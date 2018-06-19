@@ -27,7 +27,7 @@ pip install -e.
 
 ## Code description
 There are 4 important files:
-- `run_molecule.py` is the main code for running the program.
+- `run_molecule.py` is the main code for running the program. You may tune all kinds of hyper-parameters there.
 - The molecule environment code is in `gym-molecule/gym_molecule/envs/molecule.py`.
 - RL related code is in `rl-baselines/baselines/ppo1` folder: `gcn_policy.py` is the GCN policy network; `pposgd_simple_gcn.py` is the PPO algorithm specifically tuned for GCN policy.
 
