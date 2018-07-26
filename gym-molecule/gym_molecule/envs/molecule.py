@@ -97,7 +97,7 @@ class MoleculeEnv(gym.Env):
     def __init__(self):
         pass
 
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False,conditional='low',max_action=128,min_action=20):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False,conditional='low',max_action=128,min_action=20,force_final=False):
         '''
         own init function, since gym does not support passing argument
         '''
@@ -106,6 +106,7 @@ class MoleculeEnv(gym.Env):
         self.has_feature = has_feature
         self.reward_type = reward_type
         self.reward_target = reward_target
+        self.force_final = force_final
 
         self.conditional_list = load_conditional(conditional)
         if self.is_conditional:
@@ -249,7 +250,7 @@ class MoleculeEnv(gym.Env):
             terminate_condition = (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0]-self.min_action or self.counter >= self.max_action or stop) and self.counter >= self.min_action
         else:
             terminate_condition = (self.mol.GetNumAtoms() >= self.max_atom-self.possible_atom_types.shape[0] or self.counter >= self.max_action or stop) and self.counter >= self.min_action
-        if terminate_condition:
+        if terminate_condition or self.force_final:
             # default reward
             reward_valid = 2
             reward_qed = 0
@@ -317,7 +318,10 @@ class MoleculeEnv(gym.Env):
                     print('reward error')
 
             new = True # end of episode
-            reward = reward_step + reward_valid + reward_final
+            if self.force_final:
+                reward = reward_final
+            else:
+                reward = reward_step + reward_valid + reward_final
             info['smile'] = self.get_final_smiles()
             if self.is_conditional:
                 info['reward_valid'] = self.conditional[-1] ### temp change
@@ -347,7 +351,7 @@ class MoleculeEnv(gym.Env):
         return ob,reward,new,info
 
 
-    def reset(self):
+    def reset(self,smile=None):
         '''
         to avoid error, assume an atom already exists
         :return: ob
@@ -355,6 +359,9 @@ class MoleculeEnv(gym.Env):
         if self.is_conditional:
             self.conditional = random.sample(self.conditional_list, 1)[0]
             self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional[0]))
+            Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+        elif smile is not None:
+            self.mol = Chem.RWMol(Chem.MolFromSmiles(smile))
             Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
@@ -1436,9 +1443,8 @@ def get_normalized_values():
 
 
 
-
-
-
+# smile = 'C'*38
+# print(smile, reward_penalized_log_p(Chem.MolFromSmiles(smile)))
 
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
