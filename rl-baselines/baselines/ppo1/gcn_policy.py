@@ -127,12 +127,13 @@ def discriminator_net(ob,args,name='d_net'):
         if args.bn==1:
             ob_node = tf.layers.batch_normalization(ob_node,axis=-1)
         emb_node = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
+        for i in range(args.layer_num_d - 2):
+            if args.bn==1:
+                emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
+            emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate)
         if args.bn==1:
             emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
-        emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, name='gcn2',aggregate=args.gcn_aggregate)
-        if args.bn==1:
-            emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
-        emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, is_act=False, is_normalize=(args.bn == 0), name='gcn3',aggregate=args.gcn_aggregate)
+        emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, is_act=False, is_normalize=(args.bn == 0), name='gcn2',aggregate=args.gcn_aggregate)
         if args.bn==1:
             emb_node = tf.layers.batch_normalization(emb_node,axis=-1)
         # emb_graph = tf.reduce_max(tf.squeeze(emb_node2, axis=1),axis=1)  # B*f
@@ -186,7 +187,7 @@ class GCNPolicy(object):
             emb_node = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1',aggregate=args.gcn_aggregate)
         if args.bn == 1:
             emb_node = tf.layers.batch_normalization(emb_node, axis=-1)
-        for i in range(args.layer_num-2):
+        for i in range(args.layer_num_g-2):
             if args.has_residual==1:
                 emb_node = GCN_batch(ob['adj'], emb_node, args.emb_size, name='gcn1_'+str(i+1),aggregate=args.gcn_aggregate)+self.emb_node1
             elif args.has_concat==1:
@@ -367,7 +368,7 @@ def GCN_emb(ob,args):
             axis=-1)
     else:
         emb_node1 = GCN_batch(ob['adj'], ob_node, args.emb_size, name='gcn1', aggregate=args.gcn_aggregate)
-    for i in range(args.layer_num - 2):
+    for i in range(args.layer_num_g - 2):
         if args.has_residual == 1:
             emb_node1 = GCN_batch(ob['adj'], emb_node1, args.emb_size, name='gcn1_' + str(i + 1),
                                        aggregate=args.gcn_aggregate) + emb_node1

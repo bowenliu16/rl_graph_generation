@@ -89,13 +89,14 @@ def molecule_arg_parser():
     parser.add_argument('--curriculum_step', type=int, default=200)
     parser.add_argument('--supervise_time', type=int, default=4)
     parser.add_argument('--normalize_adj', type=int, default=0)
-    parser.add_argument('--layer_num', type=int, default=3)
+    parser.add_argument('--layer_num_g', type=int, default=3)
+    parser.add_argument('--layer_num_d', type=int, default=3)
     parser.add_argument('--graph_emb', type=int, default=0)
     parser.add_argument('--stop_shift', type=int, default=-3)
     parser.add_argument('--has_residual', type=int, default=0)
     parser.add_argument('--has_concat', type=int, default=0)
     parser.add_argument('--has_feature', type=int, default=0)
-    parser.add_argument('--emb_size', type=int, default=64)
+    parser.add_argument('--emb_size', type=int, default=128) # default 64
     parser.add_argument('--gcn_aggregate', type=str, default='mean')# sum, mean, concat
     parser.add_argument('--gan_type', type=str, default='normal')# normal, recommend, wgan
     parser.add_argument('--gate_sum_d', type=int, default=0)
