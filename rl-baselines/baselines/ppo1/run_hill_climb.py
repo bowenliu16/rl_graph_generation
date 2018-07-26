@@ -169,7 +169,7 @@ class Worker(multiprocessing.Process):
                 if best_reward>best_reward_best:
                     best_reward_best = best_reward
                     best_smile_best = best_smile
-                print('Process {} Step {}, best reward {}, best smile {}, best reward best {}, best smile best {}'.format(self.name, i, best_reward, best_smile, best_reward_best, best_smile_best))
+                # print('Process {} Step {}, best reward {}, best smile {}, best reward best {}, best smile best {}'.format(self.name, i, best_reward, best_smile, best_reward_best, best_smile_best))
 
                 with open(fname,'a') as f:
                     f.write('Process {} Step {}, best reward {}, best smile {}, best reward best {}, best smile best {}\n'.format(self.name, i, best_reward, best_smile, best_reward_best, best_smile_best))
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     if not os.path.exists('hill_climb_results'):
         os.makedirs('hill_climb_results')
     jobs = []
-    for i in range(80):
+    for i in range(100):
         # p = multiprocessing.Process(target=worker)
         p = Worker()
         jobs.append(p)
