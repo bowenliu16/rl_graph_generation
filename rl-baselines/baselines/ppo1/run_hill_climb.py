@@ -137,7 +137,7 @@ class Worker(multiprocessing.Process):
 
         atom_num = 38
         topk = 5
-        repeat_time = 2
+        repeat_time = 20
 
         for repeat in range(repeat_time):
             best_smile = 'C'
