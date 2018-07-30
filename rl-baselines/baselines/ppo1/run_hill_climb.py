@@ -124,9 +124,10 @@ class Worker(multiprocessing.Process):
 
     def run(self):
         """worker function"""
-        fname = 'hill_climb_results/' + self.name + '.txt'
-        if os.path.isfile(fname):
-            os.remove(fname)
+        # fname = 'hill_climb_results/' + self.name + '.txt'
+        fname = 'hill_climb_results/all.txt'
+        # if os.path.isfile(fname):
+        #     os.remove(fname)
         ## random
         np.random.seed()
         env = gym.make('molecule-v0')  # in gym format
@@ -136,7 +137,7 @@ class Worker(multiprocessing.Process):
 
         atom_num = 38
         topk = 5
-        repeat_time = 20
+        repeat_time = 2
 
         for repeat in range(repeat_time):
             best_smile = 'C'
@@ -147,10 +148,10 @@ class Worker(multiprocessing.Process):
                 list_smile = []
                 list_reward = []
                 for first in range(atom_num):
-                    for second in range(0, atom_num + 3):
+                    for second in range(0, atom_num + 9):
                         if second == first:
                             continue
-                        for edge in range(0, 2):
+                        for edge in range(0, 3):
                             env.reset(best_smile)
                             stop = 0
                             act = np.array([[first, second, edge, stop]])
@@ -171,15 +172,15 @@ class Worker(multiprocessing.Process):
                     best_smile_best = best_smile
                 # print('Process {} Step {}, best reward {}, best smile {}, best reward best {}, best smile best {}'.format(self.name, i, best_reward, best_smile, best_reward_best, best_smile_best))
 
-                with open(fname,'a') as f:
-                    f.write('Process {} Step {}, best reward {}, best smile {}, best reward best {}, best smile best {}\n'.format(self.name, i, best_reward, best_smile, best_reward_best, best_smile_best))
+            with open(fname,'a') as f:
+                f.write('Process {}, best reward best {}, best smile best {}\n'.format(self.name, best_reward_best, best_smile_best))
         return
 
 if __name__ == '__main__':
     if not os.path.exists('hill_climb_results'):
         os.makedirs('hill_climb_results')
     jobs = []
-    for i in range(100):
+    for i in range(288):
         # p = multiprocessing.Process(target=worker)
         p = Worker()
         jobs.append(p)

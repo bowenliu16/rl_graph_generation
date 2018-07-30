@@ -1444,7 +1444,8 @@ def get_normalized_values():
 
 
 # smile = 'C'*38
-# print(smile, reward_penalized_log_p(Chem.MolFromSmiles(smile)))
+smile = 'CCCCCCCCCC(CCC)(CCCCCCC)CCCCCCCCC(CCCCC)CC(C)C'
+print(smile, reward_penalized_log_p(Chem.MolFromSmiles(smile)))
 
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
