@@ -8,6 +8,7 @@ import os
 import tensorflow as tf
 
 import gym
+import gym.spaces
 from gym_molecule.envs.molecule import GraphEnv
 
 def train(args,seed,writer=None):
