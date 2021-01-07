@@ -16,6 +16,7 @@ pip install networkx=1.11
 - Install OpenAI baseline dependencies:
 ```bash
 cd rl-baselines
+pip install gym
 pip install -e .
 ```
 - Install customized molecule gym environment:
