@@ -10,6 +10,7 @@ from rdkit.Chem.FilterCatalog import FilterCatalogParams, FilterCatalog
 # disable RDKit warnings 
 from rdkit import RDLogger                                                                                                                                                               
 RDLogger.DisableLog('rdApp.*')         
+
 # import gym_molecule
 import copy
 import networkx as nx
@@ -1453,12 +1454,12 @@ print(smile, reward_penalized_log_p(Chem.MolFromSmiles(smile)))
 
 if __name__ == '__main__':
     env = gym.make('molecule-v0') # in gym format
-    # env = GraphEnv()
-    # env.init(has_scaffold=True)
+    env = GraphEnv()
+    env.init(has_scaffold=True)
 
     ## debug
-    m_env = MoleculeEnv()
-    m_env.init(data_type='zinc',has_feature=True,is_conditional=True)
+    # m_env = MoleculeEnv()
+    # m_env.init(data_type='zinc',has_feature=True,is_conditional=True)
 
 
 
