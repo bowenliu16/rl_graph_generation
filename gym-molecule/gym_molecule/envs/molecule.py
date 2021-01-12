@@ -1,7 +1,7 @@
 import gym
 import itertools
 import numpy as np
-# from rdkit import Chem  # TODO(Bowen): remove and just use AllChem
+from rdkit import Chem  # TODO(Bowen): remove and just use AllChem
 from rdkit.Chem import AllChem
 from rdkit.Chem.Descriptors import qed, MolLogP
 from rdkit.Chem import rdMolDescriptors
