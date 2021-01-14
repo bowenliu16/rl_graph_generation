@@ -914,6 +914,7 @@ class GraphEnv(gym.Env):
             reward = reward_step + reward_terminal
 
             # print terminal graph information
+            info['smile'] = self.get_final_smiles()
             info['final_stat'] = reward_terminal
             info['reward'] = reward
             info['stop'] = stop

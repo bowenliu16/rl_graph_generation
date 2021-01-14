@@ -127,12 +127,18 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
 
         if new:
             if args.env=='molecule':
-                print("Storing rewards in a file (traj_segment_generator in pposgd_simple_gcn.py...")
+                print("Storing rewards in a file (traj_segment_generator in pposgd_simple_gcn.py (molecule env path)...")
                 with open('molecule_gen/'+args.name_full+'.csv', 'a') as f:
                     str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
                     f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'], 
                     info['final_stat'], rew_env, rew_d_step, rew_d_final, cur_ep_ret, info['flag_steric_strain_filter'], 
                     info['flag_zinc_molecule_filter'], info['stop']))
+            elif args.env == 'graph':
+                print("Storing rewards in a file (traj_segment_generator in pposgd_simple_gcn.py(praph env path)...")
+                with open('molecule_gen/'+args.name_full+'.csv', 'a') as f:
+                    str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
+                    f.write(str.format(info['smile'], info['final_stat'], info['reward'] rew_env, rew_d_step, rew_d_final, cur_ep_ret))
+
             ob_adjs_final.append(ob['adj'])
             ob_nodes_final.append(ob['node'])
             ep_rets.append(cur_ep_ret)
