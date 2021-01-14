@@ -11,8 +11,11 @@ import gym
 from gym_molecule.envs.molecule import GraphEnv
 
 def train(args,seed,writer=None):
+    print('Running train in run_molecule.py')
+    ### move all imports globaly
     from baselines.ppo1 import pposgd_simple_gcn, gcn_policy
     import baselines.common.tf_util as U
+    ###
     rank = MPI.COMM_WORLD.Get_rank()
     sess = U.single_threaded_session()
     sess.__enter__()
@@ -23,12 +26,15 @@ def train(args,seed,writer=None):
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
     if args.env=='molecule':
+        print('Setting up MoleculeEnv in run_molecule.py...')
         env = gym.make('molecule-v0')
         env.init(data_type=args.dataset,logp_ratio=args.logp_ratio,qed_ratio=args.qed_ratio,sa_ratio=args.sa_ratio,reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,reward_type=args.reward_type,reward_target=args.reward_target,has_feature=bool(args.has_feature),is_conditional=bool(args.is_conditional),conditional=args.conditional,max_action=args.max_action,min_action=args.min_action) # remember call this after gym.make!!
     elif args.env=='graph':
+        print('Setting up GraphEnv in run_molecule.py...')
         env = GraphEnv()
         env.init(reward_step_total=args.reward_step_total,is_normalize=args.normalize_adj,dataset=args.dataset) # remember call this after gym.make!!
     print(env.observation_space)
+    
     def policy_fn(name, ob_space, ac_space):
         return gcn_policy.GCNPolicy(name=name, ob_space=ob_space, ac_space=ac_space, atom_type_num=env.atom_type_num,args=args)
     env.seed(workerseed)
@@ -112,6 +118,7 @@ def molecule_arg_parser():
     return parser
 
 def main():
+    print('Runnong run_molecule.py...')
     args = molecule_arg_parser().parse_args()
     print(args)
     args.name_full = args.env + '_' + args.dataset + '_' + args.name

@@ -102,7 +102,10 @@ class MoleculeEnv(gym.Env):
     def __init__(self):
         pass
 
-    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,has_feature=False,is_conditional=False,conditional='low',max_action=128,min_action=20,force_final=False):
+    def init(self,data_type='zinc',logp_ratio=1, qed_ratio=1,sa_ratio=1,reward_step_total=1,
+                is_normalize=0,reward_type='gan',reward_target=0.5,has_scaffold=False,
+                has_feature=False,is_conditional=False,conditional='low',max_action=128,
+                min_action=20,force_final=False):
         '''
         own init function, since gym does not support passing argument
         '''
@@ -221,7 +224,7 @@ class MoleculeEnv(gym.Env):
         -1 if otherwise
         """
         ### init
-        info = {}  # info we care about
+        info = {}  # info we care about. Current reward values send to pposgd_simple_gcn.py
         self.mol_old = copy.deepcopy(self.mol) # keep old mol
         total_atoms = self.mol.GetNumAtoms()
 
@@ -238,8 +241,9 @@ class MoleculeEnv(gym.Env):
             stop = True
 
         ### calculate intermediate rewards
+        # reward_step is local variable, do we need it?
         if self.check_valency():
-            if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds()>0:
+            if self.mol.GetNumAtoms()+self.mol.GetNumBonds()-self.mol_old.GetNumAtoms()-self.mol_old.GetNumBonds() > 0:
                 reward_step = self.reward_step_total/self.max_atom # successfully add node/edge
                 self.smile_list.append(self.get_final_smiles())
             else:
@@ -873,7 +877,7 @@ class GraphEnv(gym.Env):
         :return:
         """
         ### init
-        info = {}  # info we care about
+        info = {}  # info we care about. Current reward values send to pposgd_simple_gcn.py
         self.graph_old = copy.deepcopy(self.graph)
         total_nodes = self.graph.number_of_nodes()
 

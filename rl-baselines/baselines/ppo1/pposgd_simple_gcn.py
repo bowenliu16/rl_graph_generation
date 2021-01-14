@@ -14,6 +14,8 @@ import copy
 
 
 def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_final_func):
+
+    print("Running traj_segment_generator in pposgd_simple_gcn.py...")
     t = 0
     ac = env.action_space.sample() # not used, just so we have the datatype
     new = True # marks if we're on first timestep of an episode
@@ -125,9 +127,12 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
 
         if new:
             if args.env=='molecule':
+                print("Storing rewards in a file (traj_segment_generator in pposgd_simple_gcn.py...")
                 with open('molecule_gen/'+args.name_full+'.csv', 'a') as f:
                     str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
-                    f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'], info['final_stat'], rew_env, rew_d_step, rew_d_final, cur_ep_ret, info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'], info['stop']))
+                    f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'], 
+                    info['final_stat'], rew_env, rew_d_step, rew_d_final, cur_ep_ret, info['flag_steric_strain_filter'], 
+                    info['flag_zinc_molecule_filter'], info['stop']))
             ob_adjs_final.append(ob['adj'])
             ob_nodes_final.append(ob['node'])
             ep_rets.append(cur_ep_ret)
@@ -356,10 +361,11 @@ def learn(args,env, policy_fn, *,
         callback=None, # you can do anything in the callback, since it takes locals(), globals()
         adam_epsilon=1e-5,
         schedule='constant', # annealing for stepsize parameters (epsilon and adam)
-        writer=None
-        ):
+        writer=None):
     # Setup losses and stuff
     # ----------------------------------------
+
+    print("Running learn function in pposgd_simple_gcn.py...")
     ob_space = env.observation_space
     ac_space = env.action_space
     pi = policy_fn("pi", ob_space, ac_space) # Construct network for new policy
