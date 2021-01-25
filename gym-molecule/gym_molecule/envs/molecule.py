@@ -926,7 +926,7 @@ class GraphEnv(gym.Env):
             # print terminal graph information
             # ============================
             # AttributeError: 'GraphEnv' object has no attribute 'get_final_smiles'
-            info['smile'] = self.get_final_smiles()
+            # info['smile'] = self.get_final_smiles()
             # ========================================
             info['final_stat'] = reward_terminal
             info['reward'] = reward
