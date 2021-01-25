@@ -808,6 +808,7 @@ class GraphEnv(gym.Env):
     """
     def __init__(self):
         pass
+
     def init(self, reward_step_total=1, is_normalize=0,dataset='ba'):
         '''
         own init function, since gym does not support passing argument
@@ -869,6 +870,15 @@ class GraphEnv(gym.Env):
         adj_normal[np.isnan(adj_normal)] = 0
         return adj_normal
 
+    def get_final_smiles(self):
+        """
+        Returns a SMILES of the final molecule. Converts any radical
+        electrons into hydrogens. Works only if molecule is valid
+        :return: SMILES
+        """
+        m = convert_radical_electrons_to_hydrogens(self.mol)
+        return Chem.MolToSmiles(m, isomericSmiles=True)
+
     # TODO(Bowen): check
     def step(self, action):
         """
@@ -914,7 +924,10 @@ class GraphEnv(gym.Env):
             reward = reward_step + reward_terminal
 
             # print terminal graph information
+            # ============================
+            # AttributeError: 'GraphEnv' object has no attribute 'get_final_smiles'
             info['smile'] = self.get_final_smiles()
+            # ========================================
             info['final_stat'] = reward_terminal
             info['reward'] = reward
             info['stop'] = stop

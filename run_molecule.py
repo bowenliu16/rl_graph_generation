@@ -118,7 +118,7 @@ def molecule_arg_parser():
     return parser
 
 def main():
-    print('Runnong run_molecule.py...')
+    print('Running run_molecule.py...')
     args = molecule_arg_parser().parse_args()
     print(args)
     args.name_full = args.env + '_' + args.dataset + '_' + args.name

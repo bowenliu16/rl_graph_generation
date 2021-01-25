@@ -94,7 +94,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
         acs[i] = ac
         prevacs[i] = prevac
 
-        ob, rew_env, new, info = env.step(ac)
+        ob, rew_env, new, info = env.step(ac) # no action there, trace bug in envs/molecule.py
         rew_d_step = 0 # default
         if rew_env>0: # if action valid
             cur_ep_len_valid += 1
