@@ -25,9 +25,9 @@ def GCN(adj, node_feature, out_channels, is_act=True, is_normalize=False, name='
         if is_act:
             node_embedding = tf.nn.relu(node_embedding)
         # todo: try complex aggregation
-        node_embedding = tf.reduce_mean(node_embedding,axis=0,keepdims=True) # mean pooling
+        node_embedding = tf.reduce_mean(node_embedding,axis=0,keep_dims=True) # mean pooling
         if is_normalize:
-            node_embedding = tf.nn.l2_normalize(node_embedding,axis=-1)
+            node_embedding = tf.nn.l2_normalize(node_embedding,dim=-1)
         return node_embedding
 
 # gcn mean aggregation over edge features
@@ -52,15 +52,15 @@ def GCN_batch(adj, node_feature, out_channels, is_act=True, is_normalize=False, 
         if is_act:
             node_embedding = tf.nn.relu(node_embedding)
         if aggregate == 'sum':
-            node_embedding = tf.reduce_sum(node_embedding, axis=1, keepdims=True)  # mean pooling
+            node_embedding = tf.reduce_sum(node_embedding, axis=1, keep_dims=True)  # mean pooling
         elif aggregate=='mean':
-            node_embedding = tf.reduce_mean(node_embedding,axis=1,keepdims=True) # mean pooling
+            node_embedding = tf.reduce_mean(node_embedding,axis=1,keep_dims=True) # mean pooling
         elif aggregate=='concat':
             node_embedding = tf.concat(tf.split(node_embedding,axis=1,num_or_size_splits=edge_dim),axis=3)
         else:
             print('GCN aggregate error!')
         if is_normalize:
-            node_embedding = tf.nn.l2_normalize(node_embedding,axis=-1)
+            node_embedding = tf.nn.l2_normalize(node_embedding,dim=-1)
         return node_embedding
 
 # # gcn mean aggregation over edge features, multi hop version
@@ -211,7 +211,7 @@ class GCNPolicy(object):
             emb_node = tf.where(condition=tf.tile(tf.expand_dims(logits_mask,axis=-1),(1,1,emb_node.get_shape()[-1])), x=emb_node, y=emb_node_null)
 
         ## get graph embedding
-        emb_graph = tf.reduce_sum(emb_node, axis=1, keepdims=True)
+        emb_graph = tf.reduce_sum(emb_node, axis=1, keep_dims=True)
         if args.graph_emb == 1:
             emb_graph = tf.tile(emb_graph, [1, tf.shape(emb_node)[1], 1])
             emb_node = tf.concat([emb_node, emb_graph], axis=2)

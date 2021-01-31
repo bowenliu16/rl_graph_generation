@@ -14,6 +14,8 @@ import copy
 
 
 def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_final_func):
+
+    print("Running traj_segment_generator in pposgd_simple_gcn.py...")
     t = 0
     ac = env.action_space.sample() # not used, just so we have the datatype
     new = True # marks if we're on first timestep of an episode
@@ -92,7 +94,7 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
         acs[i] = ac
         prevacs[i] = prevac
 
-        ob, rew_env, new, info = env.step(ac)
+        ob, rew_env, new, info = env.step(ac) # no action there, trace bug in envs/molecule.py
         rew_d_step = 0 # default
         if rew_env>0: # if action valid
             cur_ep_len_valid += 1
@@ -125,9 +127,18 @@ def traj_segment_generator(args, pi, env, horizon, stochastic, d_step_func, d_fi
 
         if new:
             if args.env=='molecule':
+                print("Storing rewards in a file (traj_segment_generator in pposgd_simple_gcn.py (molecule env path)...")
                 with open('molecule_gen/'+args.name_full+'.csv', 'a') as f:
                     str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
-                    f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'], info['final_stat'], rew_env, rew_d_step, rew_d_final, cur_ep_ret, info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'], info['stop']))
+                    f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'], 
+                    info['final_stat'], rew_env, rew_d_step, rew_d_final, cur_ep_ret, info['flag_steric_strain_filter'], 
+                    info['flag_zinc_molecule_filter'], info['stop']))
+            elif args.env == 'graph':
+                print("Storing rewards in a file (traj_segment_generator in pposgd_simple_gcn.py(praph env path)...")
+                with open('molecule_gen/'+args.name_full+'.csv', 'a') as f:
+                    str = ''.join(['{},']*(len(info)+3))[:-1]+'\n'
+                    f.write(str.format(info['smile'], info['final_stat'], info['reward'], rew_env, rew_d_step, rew_d_final, cur_ep_ret))
+
             ob_adjs_final.append(ob['adj'])
             ob_nodes_final.append(ob['node'])
             ep_rets.append(cur_ep_ret)
@@ -356,10 +367,11 @@ def learn(args,env, policy_fn, *,
         callback=None, # you can do anything in the callback, since it takes locals(), globals()
         adam_epsilon=1e-5,
         schedule='constant', # annealing for stepsize parameters (epsilon and adam)
-        writer=None
-        ):
+        writer=None):
     # Setup losses and stuff
     # ----------------------------------------
+
+    print("Running learn function in pposgd_simple_gcn.py...")
     ob_space = env.observation_space
     ac_space = env.action_space
     pi = policy_fn("pi", ob_space, ac_space) # Construct network for new policy
