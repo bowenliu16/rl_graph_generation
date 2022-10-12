@@ -10,20 +10,38 @@ conda create -c rdkit -n my-rdkit-env rdkit
 ```
 - Install mpi4py, networkx:
 ```bash
-conda install mpi4py
-pip install networkx=1.11
+conda install -y mpi4py
+pip install networkx==1.11
+pip install matplotlib==3.5.3
 ```
 - Install OpenAI baseline dependencies:
 ```bash
-cd rl-baselines
-pip install -e .
+pip install -e rl-baselines
 ```
 - Install customized molecule gym environment:
 ```bash
-cd gym-molecule
-pip install -e.
+pip install -e gym-molecule
 ```
 
+## Alternative Install instructions
+For greater reproducibility a `Dockerfile` is provided that can be used to build an environment in which this code simply runs. To use this container environment download and install [Docker](https://www.docker.com/). To more easily reproduce the build and run steps install [Make](https://www.gnu.org/software/make/) and run the recipes provided in the [Makefile](Makefile).
+- To build the Docker container:
+```bash
+make build
+```
+- To run this Docker container with/out a gpu while mounting the project into the running container:
+```bash
+make run_dev_{gpu}
+```
+- Enter the running container:
+```bash
+docker exec -it <container id> bash
+```
+- Activate conda environment and install project dependencies:
+```bash
+conda activate my-rdkit-env
+bash install.sh
+```
 
 ## Code description
 There are 4 important files:
